@@ -2,41 +2,38 @@ package org.thoughtcrime.securesms.components.settings.app
 
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.viewModels
-import androidx.navigation.Navigation
 import androidx.navigation.fragment.findNavController
 import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.badges.BadgeImageView
 import org.thoughtcrime.securesms.components.AvatarImageView
 import org.thoughtcrime.securesms.components.settings.DSLConfiguration
-import org.thoughtcrime.securesms.components.settings.DSLSettingsAdapter
 import org.thoughtcrime.securesms.components.settings.DSLSettingsFragment
 import org.thoughtcrime.securesms.components.settings.DSLSettingsIcon
 import org.thoughtcrime.securesms.components.settings.DSLSettingsText
 import org.thoughtcrime.securesms.components.settings.PreferenceModel
 import org.thoughtcrime.securesms.components.settings.PreferenceViewHolder
-import org.thoughtcrime.securesms.components.settings.app.subscription.SubscriptionsRepository
 import org.thoughtcrime.securesms.components.settings.configure
-import org.thoughtcrime.securesms.dependencies.ApplicationDependencies
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.phonenumbers.PhoneNumberFormatter
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.util.FeatureFlags
-import org.thoughtcrime.securesms.util.MappingAdapter
-import org.thoughtcrime.securesms.util.MappingViewHolder
+import org.thoughtcrime.securesms.util.PlayServicesUtil
+import org.thoughtcrime.securesms.util.Util
+import org.thoughtcrime.securesms.util.adapter.mapping.LayoutFactory
+import org.thoughtcrime.securesms.util.adapter.mapping.MappingAdapter
+import org.thoughtcrime.securesms.util.adapter.mapping.MappingViewHolder
+import org.thoughtcrime.securesms.util.navigation.safeNavigate
 
 class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__menu_settings) {
 
-  private val viewModel: AppSettingsViewModel by viewModels(
-    factoryProducer = {
-      AppSettingsViewModel.Factory(SubscriptionsRepository(ApplicationDependencies.getDonationsService()))
-    }
-  )
+  private val viewModel: AppSettingsViewModel by viewModels()
 
-  override fun bindAdapter(adapter: DSLSettingsAdapter) {
-    adapter.registerFactory(BioPreference::class.java, MappingAdapter.LayoutFactory(::BioPreferenceViewHolder, R.layout.bio_preference_item))
-    adapter.registerFactory(PaymentsPreference::class.java, MappingAdapter.LayoutFactory(::PaymentsPreferenceViewHolder, R.layout.dsl_payments_preference))
-    adapter.registerFactory(SubscriptionPreference::class.java, MappingAdapter.LayoutFactory(::SubscriptionPreferenceViewHolder, R.layout.dsl_preference_item))
+  override fun bindAdapter(adapter: MappingAdapter) {
+    adapter.registerFactory(BioPreference::class.java, LayoutFactory(::BioPreferenceViewHolder, R.layout.bio_preference_item))
+    adapter.registerFactory(PaymentsPreference::class.java, LayoutFactory(::PaymentsPreferenceViewHolder, R.layout.dsl_payments_preference))
+    adapter.registerFactory(SubscriptionPreference::class.java, LayoutFactory(::SubscriptionPreferenceViewHolder, R.layout.dsl_preference_item))
 
     viewModel.state.observe(viewLifecycleOwner) { state ->
       adapter.submitList(getConfiguration(state).toMappingModelList())
@@ -45,7 +42,7 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
 
   override fun onResume() {
     super.onResume()
-    viewModel.refreshActiveSubscription()
+    viewModel.refreshExpiredGiftBadge()
   }
 
   private fun getConfiguration(state: AppSettingsState): DSLConfiguration {
@@ -53,7 +50,7 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
 
       customPref(
         BioPreference(state.self) {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_manageProfileActivity)
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_manageProfileActivity)
         }
       )
 
@@ -61,7 +58,7 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
         title = DSLSettingsText.from(R.string.AccountSettingsFragment__account),
         icon = DSLSettingsIcon.from(R.drawable.ic_profile_circle_24),
         onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_accountSettingsFragment)
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_accountSettingsFragment)
         }
       )
 
@@ -69,102 +66,20 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
         title = DSLSettingsText.from(R.string.preferences__linked_devices),
         icon = DSLSettingsIcon.from(R.drawable.ic_linked_devices_24),
         onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_deviceActivity)
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_deviceActivity)
         }
       )
 
-      if (SignalStore.paymentsValues().paymentsAvailability.showPaymentsMenu()) {
-        customPref(
-          PaymentsPreference(
-            unreadCount = state.unreadPaymentsCount
-          ) {
-            Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_paymentsActivity)
-          }
-        )
-      }
+      if (FeatureFlags.donorBadges() && PlayServicesUtil.getPlayServicesStatus(requireContext()) == PlayServicesUtil.PlayServicesStatus.SUCCESS) {
 
-      dividerPref()
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.preferences__appearance),
-        icon = DSLSettingsIcon.from(R.drawable.ic_appearance_24),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_appearanceSettingsFragment)
-        }
-      )
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.preferences_chats__chats),
-        icon = DSLSettingsIcon.from(R.drawable.ic_message_tinted_bitmap_24),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_chatsSettingsFragment)
-        }
-      )
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.preferences__notifications),
-        icon = DSLSettingsIcon.from(R.drawable.ic_bell_24),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_notificationsSettingsFragment)
-        }
-      )
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.preferences__privacy),
-        icon = DSLSettingsIcon.from(R.drawable.ic_lock_24),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_privacySettingsFragment)
-        }
-      )
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.preferences__data_and_storage),
-        icon = DSLSettingsIcon.from(R.drawable.ic_archive_24dp),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_dataAndStorageSettingsFragment)
-        }
-      )
-
-      dividerPref()
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.preferences__help),
-        icon = DSLSettingsIcon.from(R.drawable.ic_help_24),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_helpSettingsFragment)
-        }
-      )
-
-      clickPref(
-        title = DSLSettingsText.from(R.string.AppSettingsFragment__invite_your_friends),
-        icon = DSLSettingsIcon.from(R.drawable.ic_invite_24),
-        onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_inviteActivity)
-        }
-      )
-
-      if (FeatureFlags.donorBadges()) {
-        customPref(
-          SubscriptionPreference(
-            title = DSLSettingsText.from(R.string.preferences__subscription),
-            icon = DSLSettingsIcon.from(R.drawable.ic_heart_24),
-            isActive = state.hasActiveSubscription,
-            onClick = { isActive ->
-              findNavController()
-                .navigate(
-                  AppSettingsFragmentDirections.actionAppSettingsFragmentToSubscriptions()
-                    .setSkipToSubscribe(!isActive)
-                )
-            }
-          )
-        )
-        // TODO [alex] -- clap
         clickPref(
-          title = DSLSettingsText.from(R.string.preferences__signal_boost),
+          title = DSLSettingsText.from(R.string.preferences__donate_to_signal),
           icon = DSLSettingsIcon.from(R.drawable.ic_heart_24),
+          iconEnd = if (state.hasExpiredGiftBadge) DSLSettingsIcon.from(R.drawable.ic_info_solid_24, R.color.signal_accent_primary) else null,
           onClick = {
-            findNavController().navigate(R.id.action_appSettingsFragment_to_boostsFragment)
-          }
+            findNavController().safeNavigate(AppSettingsFragmentDirections.actionAppSettingsFragmentToManageDonationsFragment())
+          },
+          onLongClick = this@AppSettingsFragment::copySubscriberIdToClipboard
         )
       } else {
         externalLinkPref(
@@ -174,16 +89,99 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
         )
       }
 
+      dividerPref()
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.preferences__appearance),
+        icon = DSLSettingsIcon.from(R.drawable.ic_appearance_24),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_appearanceSettingsFragment)
+        }
+      )
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.preferences_chats__chats),
+        icon = DSLSettingsIcon.from(R.drawable.ic_chat_message_24),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_chatsSettingsFragment)
+        }
+      )
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.preferences__notifications),
+        icon = DSLSettingsIcon.from(R.drawable.ic_bell_24),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_notificationsSettingsFragment)
+        }
+      )
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.preferences__privacy),
+        icon = DSLSettingsIcon.from(R.drawable.ic_lock_24),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_privacySettingsFragment)
+        }
+      )
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.preferences__data_and_storage),
+        icon = DSLSettingsIcon.from(R.drawable.ic_archive_24dp),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_dataAndStorageSettingsFragment)
+        }
+      )
+
+      dividerPref()
+
+      if (SignalStore.paymentsValues().paymentsAvailability.showPaymentsMenu()) {
+        customPref(
+          PaymentsPreference(
+            unreadCount = state.unreadPaymentsCount
+          ) {
+            findNavController().safeNavigate(R.id.action_appSettingsFragment_to_paymentsActivity)
+          }
+        )
+
+        dividerPref()
+      }
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.preferences__help),
+        icon = DSLSettingsIcon.from(R.drawable.ic_help_24),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_helpSettingsFragment)
+        }
+      )
+
+      clickPref(
+        title = DSLSettingsText.from(R.string.AppSettingsFragment__invite_your_friends),
+        icon = DSLSettingsIcon.from(R.drawable.ic_invite_24),
+        onClick = {
+          findNavController().safeNavigate(R.id.action_appSettingsFragment_to_inviteActivity)
+        }
+      )
+
       if (FeatureFlags.internalUser()) {
         dividerPref()
 
         clickPref(
           title = DSLSettingsText.from(R.string.preferences__internal_preferences),
           onClick = {
-            Navigation.findNavController(requireView()).navigate(R.id.action_appSettingsFragment_to_internalSettingsFragment)
+            findNavController().safeNavigate(R.id.action_appSettingsFragment_to_internalSettingsFragment)
           }
         )
       }
+    }
+  }
+
+  private fun copySubscriberIdToClipboard(): Boolean {
+    val subscriber = SignalStore.donationsValues().getSubscriber()
+    return if (subscriber == null) {
+      false
+    } else {
+      Toast.makeText(requireContext(), R.string.AppSettingsFragment__copied_subscriber_id_to_clipboard, Toast.LENGTH_LONG).show()
+      Util.copyToClipboard(requireContext(), subscriber.subscriberId.serialize())
+      true
     }
   }
 
@@ -193,11 +191,13 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
     override val icon: DSLSettingsIcon? = null,
     override val isEnabled: Boolean = true,
     val isActive: Boolean = false,
-    val onClick: (Boolean) -> Unit
+    val onClick: (Boolean) -> Unit,
+    val onLongClick: () -> Boolean
   ) : PreferenceModel<SubscriptionPreference>() {
     override fun areItemsTheSame(newItem: SubscriptionPreference): Boolean {
       return true
     }
+
     override fun areContentsTheSame(newItem: SubscriptionPreference): Boolean {
       return super.areContentsTheSame(newItem) && isActive == newItem.isActive
     }
@@ -207,6 +207,7 @@ class AppSettingsFragment : DSLSettingsFragment(R.string.text_secure_normal__men
     override fun bind(model: SubscriptionPreference) {
       super.bind(model)
       itemView.setOnClickListener { model.onClick(model.isActive) }
+      itemView.setOnLongClickListener { model.onLongClick() }
     }
   }
 

@@ -7,18 +7,24 @@ import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexboxLayoutManager
 import com.google.android.flexbox.JustifyContent
+import org.signal.core.util.DimensionUnit
+import org.signal.core.util.logging.Log
+import org.signal.libsignal.protocol.util.Pair
 import org.thoughtcrime.securesms.BuildConfig
-import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.badges.models.Badge
 import org.thoughtcrime.securesms.badges.models.Badge.Category.Companion.fromCode
 import org.thoughtcrime.securesms.components.settings.DSLConfiguration
+import org.thoughtcrime.securesms.database.model.databaseprotos.BadgeList
 import org.thoughtcrime.securesms.util.ScreenDensity
-import org.whispersystems.libsignal.util.Pair
 import org.whispersystems.signalservice.api.profiles.SignalServiceProfile
 import java.math.BigDecimal
 import java.sql.Timestamp
+import java.util.concurrent.TimeUnit
 
 object Badges {
+
+  private val TAG: String = Log.tag(Badges::class.java)
+
   fun DSLConfiguration.displayBadges(
     context: Context,
     badges: List<Badge>,
@@ -35,8 +41,11 @@ object Badges {
       }
       .forEach { customPref(it) }
 
-    val perRow = context.resources.getInteger(R.integer.badge_columns)
-    val empties = (perRow - (badges.size % perRow)) % perRow
+    val badgeSize = DimensionUnit.DP.toPixels(88f)
+    val windowWidth = context.resources.displayMetrics.widthPixels
+    val perRow = (windowWidth / badgeSize).toInt()
+
+    val empties = ((perRow - (badges.size % perRow)) % perRow)
     repeat(empties) {
       customPref(Badge.EmptyModel())
     }
@@ -59,19 +68,49 @@ object Badges {
   }
 
   private fun getBestBadgeImageUriForDevice(serviceBadge: SignalServiceProfile.Badge): Pair<Uri, String> {
-    val bestDensity = ScreenDensity.getBestDensityBucketForDevice()
-    return when (bestDensity) {
+    return when (ScreenDensity.getBestDensityBucketForDevice()) {
       "ldpi" -> Pair(getBadgeImageUri(serviceBadge.sprites6[0]), "ldpi")
       "mdpi" -> Pair(getBadgeImageUri(serviceBadge.sprites6[1]), "mdpi")
       "hdpi" -> Pair(getBadgeImageUri(serviceBadge.sprites6[2]), "hdpi")
       "xxhdpi" -> Pair(getBadgeImageUri(serviceBadge.sprites6[4]), "xxhdpi")
       "xxxhdpi" -> Pair(getBadgeImageUri(serviceBadge.sprites6[5]), "xxxhdpi")
-      else -> Pair(getBadgeImageUri(serviceBadge.sprites6[3]), "xdpi")
+      else -> Pair(getBadgeImageUri(serviceBadge.sprites6[3]), "xhdpi")
+    }.also {
+      Log.d(TAG, "Selected badge density ${it.second()}")
     }
   }
 
   private fun getTimestamp(bigDecimal: BigDecimal): Long {
     return Timestamp(bigDecimal.toLong() * 1000).time
+  }
+
+  @JvmStatic
+  fun fromDatabaseBadge(badge: BadgeList.Badge): Badge {
+    return Badge(
+      badge.id,
+      fromCode(badge.category),
+      badge.name,
+      badge.description,
+      Uri.parse(badge.imageUrl),
+      badge.imageDensity,
+      badge.expiration,
+      badge.visible,
+      0L
+    )
+  }
+
+  @JvmStatic
+  fun toDatabaseBadge(badge: Badge): BadgeList.Badge {
+    return BadgeList.Badge.newBuilder()
+      .setId(badge.id)
+      .setCategory(badge.category.code)
+      .setDescription(badge.description)
+      .setExpiration(badge.expirationTimestamp)
+      .setVisible(badge.visible)
+      .setName(badge.name)
+      .setImageUrl(badge.imageUrl.toString())
+      .setImageDensity(badge.imageDensity)
+      .build()
   }
 
   @JvmStatic
@@ -85,7 +124,8 @@ object Badges {
       uriAndDensity.first(),
       uriAndDensity.second(),
       serviceBadge.expiration?.let { getTimestamp(it) } ?: 0,
-      serviceBadge.isVisible
+      serviceBadge.isVisible,
+      TimeUnit.SECONDS.toMillis(serviceBadge.duration)
     )
   }
 }

@@ -307,16 +307,7 @@
     <item quantity="one">Senkez adiwenni ɣer tbewwaḍt n urmas</item>
     <item quantity="other">Senkez %d n yidiwenniyen ɣer tnaka n urmas</item>
   </plurals>
-  <string name="ConversationListFragment_read">Γaṛ</string>
-  <string name="ConversationListFragment_unread">Ur ittwaγṛi ara</string>
-  <string name="ConversationListFragment_pin">Amessak</string>
-  <string name="ConversationListFragment_unpin">Fsi</string>
-  <string name="ConversationListFragment_mute">Kkes imesli</string>
-  <string name="ConversationListFragment_unmute">Err imesli</string>
   <string name="ConversationListFragment_select">Fren</string>
-  <string name="ConversationListFragment_archive">Tarcivt</string>
-  <string name="ConversationListFragment_unarchive">Kkes aɣbar</string>
-  <string name="ConversationListFragment_delete">Kkes</string>
   <string name="ConversationListFragment_select_all">Fren akk</string>
   <!--ConversationListItem-->
   <string name="ConversationListItem_key_exchange_message">Izen n umyibdel n tsura</string>
@@ -328,7 +319,7 @@
   <!--ConversationTypingView-->
   <string name="ConversationTypingView__plus_d">+%1$d</string>
   <!--CreateGroupActivity-->
-  <string name="CreateGroupActivity_some_contacts_cannot_be_in_legacy_groups">Kra n yinermisen ur zmiren ara ad ilin deg yigrawen iqburen.</string>
+  <!-- Removed by excludeNonTranslatables <string name="CreateGroupActivity_some_contacts_cannot_be_in_legacy_groups">Kra n yinermisen ur zmiren ara ad ilin deg yigrawen iqburen.</string> -->
   <!--CreateProfileActivity-->
   <string name="CreateProfileActivity__profile">Amaɣnu</string>
   <string name="CreateProfileActivity_error_setting_profile_photo">Tella-d tuccḍa deg usbadu n tewlaft n umaɣnu</string>
@@ -397,13 +388,13 @@
   <!--DocumentView-->
   <string name="DocumentView_unnamed_file">Afaylu war isem</string>
   <!--DonateMegaphone-->
-  <string name="DonateMegaphone_donate_to_signal">Mudd i Signal</string>
-  <string name="DonateMegaphone_Signal_is_powered_by_people_like_you_show_your_support_today">Signal yella-d s lmendad n yimdanen am kečč·kemm. Sken tallalt-inek·inem ass-a!</string>
-  <string name="DonateMegaphone_donate">Mudd tawsa</string>
-  <string name="DonateMegaphone_no_thanks">Ala tanemmirt</string>
+  <!-- Removed by excludeNonTranslatables <string name="DonateMegaphone_donate_to_signal">Mudd i Signal</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="DonateMegaphone_Signal_is_powered_by_people_like_you_show_your_support_today">Signal yella-d s lmendad n yimdanen am kečč·kemm. Sken tallalt-inek·inem ass-a!</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="DonateMegaphone_donate">Mudd tawsa</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="DonateMegaphone_no_thanks">Ala tanemmirt</string> -->
   <!--GroupCallingMegaphone-->
-  <string name="GroupCallingMegaphone__introducing_group_calls">Asidef n yisawalen n ugraw</string>
-  <string name="GroupCallingMegaphone__open_a_new_group_to_start">Ldi Agraw Amaynut i beddu n usiwel n ugraw yettwawgelhen aṭel</string>
+  <!-- Removed by excludeNonTranslatables <string name="GroupCallingMegaphone__introducing_group_calls">Asidef n yisawalen n ugraw</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="GroupCallingMegaphone__open_a_new_group_to_start">Ldi Agraw Amaynut i beddu n usiwel n ugraw yettwawgelhen aṭel</string> -->
   <!--DozeReminder-->
   <string name="DozeReminder_optimize_for_missing_play_services">Sefrer imeẓla n Play i ixuṣṣen</string>
   <string name="DozeReminder_this_device_does_not_support_play_services_tap_to_disable_system_battery">Ibenk-a ur isefrak ara imeẓla n Play. Sit i wakken ad tsenseḍ isefrar n uẓru n unagraw ara yeǧǧen Signal ad d-yerr iznan mi ara yili d arurmid.</string>
@@ -417,8 +408,8 @@
   </plurals>
   <string name="PendingGroupJoinRequestsReminder_view">Sken</string>
   <!--ShareActivity-->
-  <string name="ShareActivity_share_with">Bḍu akked</string>
-  <string name="ShareActivity_multiple_attachments_are_only_supported">Aṭas n tceqqufin yeddna ttusefrakent kan i tugniwin d tvidyutin</string>
+  <!-- Removed by excludeNonTranslatables <string name="ShareActivity_share_with">Bḍu akked</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ShareActivity_multiple_attachments_are_only_supported">Aṭas n tceqqufin yeddna ttusefrakent kan i tugniwin d tvidyutin</string> -->
   <!--GcmRefreshJob-->
   <string name="GcmRefreshJob_Permanent_Signal_communication_failure">Taywalt n Signal mazal ur iteddu ara!</string>
   <string name="GcmRefreshJob_Signal_was_unable_to_register_with_Google_Play_Services">Signal ur yermid ara i usekles akked yimeẓla n Google Play. Iznan d yisawalen n Signal nsan, ttxil-k·m ɛreḍ ad talseḍ ajerred deg Yiɣewwaren &gt; leqqyaen.</string>
@@ -521,9 +512,9 @@
   <string name="LeaveGroupDialog_before_you_leave_you_must_choose_at_least_one_new_admin_for_this_group">Send ad teǧǧeḍ Signal, ilaq ad tferneḍ ma drus yiwen unedbal amaynut i ugraw-a.</string>
   <string name="LeaveGroupDialog_choose_admin">Fren anedbal</string>
   <!--LinkPreviewsMegaphone-->
-  <string name="LinkPreviewsMegaphone_disable">Sens</string>
-  <string name="LinkPreviewsMegaphone_preview_any_link">Taskant n yiwen seg yiseɣwan</string>
-  <string name="LinkPreviewsMegaphone_you_can_now_retrieve_link_previews_directly_from_any_website">Tzemreḍ tura ad d-terreḍ tiskanin n yiseɣwan srid seg yismal web i yiznan i tuzneḍ.</string>
+  <!-- Removed by excludeNonTranslatables <string name="LinkPreviewsMegaphone_disable">Sens</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="LinkPreviewsMegaphone_preview_any_link">Taskant n yiwen seg yiseɣwan</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="LinkPreviewsMegaphone_you_can_now_retrieve_link_previews_directly_from_any_website">Tzemreḍ tura ad d-terreḍ tiskanin n yiseɣwan srid seg yismal web i yiznan i tuzneḍ.</string> -->
   <!--LinkPreviewView-->
   <string name="LinkPreviewView_no_link_preview_available">Ulac taskant n useɣwan yellan</string>
   <string name="LinkPreviewView_this_group_link_is_not_active">Aseɣwen-a n ugraw ur yermid ara</string>
@@ -578,30 +569,30 @@
   <string name="AddGroupDetailsFragment__this_field_is_required">Urti-agi ilaq.</string>
   <string name="AddGroupDetailsFragment__group_creation_failed">Tella-d tuccḍa deg usnulfu n ugraw.</string>
   <string name="AddGroupDetailsFragment__try_again_later">Ɛreḍ tikelt nniḍen</string>
-  <string name="AddGroupDetailsFragment__youve_selected_a_contact_that_doesnt">Tferneḍ anermis ur nsefraka ara igrawen n Signal, ihi agraw-a ad yili d MMS.</string>
-  <string name="AddGroupDetailsFragment_custom_mms_group_names_and_photos_will_only_be_visible_to_you">Sagen ismawen d tewlafin n ugraw ara ad d-ibanen kan i kečč·kemm.</string>
+  <!-- Removed by excludeNonTranslatables <string name="AddGroupDetailsFragment__youve_selected_a_contact_that_doesnt">Tferneḍ anermis ur nsefraka ara igrawen n Signal, ihi agraw-a ad yili d MMS.</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="AddGroupDetailsFragment_custom_mms_group_names_and_photos_will_only_be_visible_to_you">Sagen ismawen d tewlafin n ugraw ara ad d-ibanen kan i kečč·kemm.</string> -->
   <string name="AddGroupDetailsFragment__remove">Kkes</string>
   <string name="AddGroupDetailsFragment__sms_contact">Anermis SMS</string>
   <string name="AddGroupDetailsFragment__remove_s_from_this_group">Kkes %1$s seg ugraw-a?</string>
-  <plurals name="AddGroupDetailsFragment__d_members_do_not_support_new_groups">
+  <!-- Removed by excludeNonTranslatables <plurals name="AddGroupDetailsFragment__d_members_do_not_support_new_groups">
     <item quantity="one">%d uεeggal ur isefrak ara igrawen imaynuten, ihi ad yili d agraw amaynut.</item>
     <item quantity="other">%d yiεeggalen ur sefraken ara igrawen imaynuten, ihi agraw-a ad yili d agraw ameqqran.</item>
-  </plurals>
-  <plurals name="AddGroupDetailsFragment__d_members_do_not_support_new_groups_so_this_group_cannot_be_created">
+  </plurals> -->
+  <!-- Removed by excludeNonTranslatables <plurals name="AddGroupDetailsFragment__d_members_do_not_support_new_groups_so_this_group_cannot_be_created">
     <item quantity="one">%d uεeggal ur sefraken ara igrawen imaynuten, ihi agraw-a ad yili d agraw ameqqran.</item>
     <item quantity="other">%d yiεeggalen ur sefraken ara igrawen imaynuten, ihi agraw-a ur yezmir ara ad d-yettwarnu.</item>
-  </plurals>
+  </plurals> -->
   <!--NonGv2MemberDialog-->
-  <string name="NonGv2MemberDialog_single_users_are_non_gv2_capable">Agraw aqbur ad yettwarnu acku \"%1$s\" iseqdac lqem aqbur n Signal. Tzemreḍ ad ternuḍ agraw n uɣanib amaynut yid-sen seld lqem n Signal, neɣ kkes-iten send timerna n ugraw.</string>
-  <plurals name="NonGv2MemberDialog_d_users_are_non_gv2_capable">
+  <!-- Removed by excludeNonTranslatables <string name="NonGv2MemberDialog_single_users_are_non_gv2_capable">Agraw aqbur ad yettwarnu acku \"%1$s\" iseqdac lqem aqbur n Signal. Tzemreḍ ad ternuḍ agraw n uɣanib amaynut yid-sen seld lqem n Signal, neɣ kkes-iten send timerna n ugraw.</string> -->
+  <!-- Removed by excludeNonTranslatables <plurals name="NonGv2MemberDialog_d_users_are_non_gv2_capable">
     <item quantity="one">Agraw aqbur ad yettwarnu acku %1$d n uεeggal iseqdac lqem aqbur n Signal. Tzemreḍ ad ternuḍ agraw n uɣanib amaynut yid-s seld lqem n Signal, neɣ kkes-it send timerna n ugraw.</item>
     <item quantity="other">Agraw aqbur ad yettwarnu acku %1$d n yiεeggalen seqdacen lqem aqbur n Signal. Tzemreḍ ad ternuḍ agraw n uɣanib amaynut yid-sen seld lqem n Signal, neɣ kkes-iten send timerna n ugraw.</item>
-  </plurals>
-  <string name="NonGv2MemberDialog_single_users_are_non_gv2_capable_forced_migration">Agraw-a ur yezmir ara ad yettwarnu acku \"%1$s\" iseqdac lqem aqbur n Signal. Ilaq ad t-tekkseḍ send timerna n ugraw.</string>
-  <plurals name="NonGv2MemberDialog_d_users_are_non_gv2_capable_forced_migration">
+  </plurals> -->
+  <!-- Removed by excludeNonTranslatables <string name="NonGv2MemberDialog_single_users_are_non_gv2_capable_forced_migration">Agraw-a ur yezmir ara ad yettwarnu acku \"%1$s\" iseqdac lqem aqbur n Signal. Ilaq ad t-tekkseḍ send timerna n ugraw.</string> -->
+  <!-- Removed by excludeNonTranslatables <plurals name="NonGv2MemberDialog_d_users_are_non_gv2_capable_forced_migration">
     <item quantity="one">Agraw-a ur yezmir ara ad yettwarnu acku %1$d n uεeggal iseqdac lqem aqbur n Signal. Ilaq ad t-tekkseḍ send timerna n ugraw.</item>
     <item quantity="other">Agraw-a ur yezmir ara ad yettwarnu acku %1$d n yiεeggalen seqdacen lqem aqbur n Signal. Ilaq ad ten-tekkseḍ send timerna n ugraw.</item>
-  </plurals>
+  </plurals> -->
   <!--ManageGroupActivity-->
   <string name="ManageGroupActivity_member_requests_and_invites">Tuttriwin n uεeggal &amp; tinubgiwin</string>
   <string name="ManageGroupActivity_add_members">Rnu iɛeggalen</string>
@@ -705,7 +696,7 @@
   <string name="GroupJoinBottomSheetDialogFragment_unable_to_join_group_please_try_again_later">Timerna ɣer ugraw d awezɣi. Ttxil-k·m εreḍ tikkelt-nniḍen</string>
   <string name="GroupJoinBottomSheetDialogFragment_encountered_a_network_error">Nemlal-d d tuccḍa deg uzeṭṭa</string>
   <string name="GroupJoinBottomSheetDialogFragment_this_group_link_is_not_active">Aseɣwen-a n ugraw ur yermid ara</string>
-  <string name="GroupJoinBottomSheetDialogFragment_unable_to_get_group_information_please_try_again_later">Awway n telɣut n ugraw d awezɣi, ttxil-k·m εreḍ tikkelt-nniḍen ticki</string>
+  <!-- Removed by excludeNonTranslatables <string name="GroupJoinBottomSheetDialogFragment_unable_to_get_group_information_please_try_again_later">Awway n telɣut n ugraw d awezɣi, ttxil-k·m εreḍ tikkelt-nniḍen ticki</string> -->
   <string name="GroupJoinBottomSheetDialogFragment_direct_join">Tebɣiḍ ad ternuḍ ɣer ugraw-a, ad ternuḍ ad tebḍuḍ isem d tewlaft inek·inem akked yiɛeggalen-is?</string>
   <string name="GroupJoinBottomSheetDialogFragment_admin_approval_needed">Anedbal n ugraw-a ilaq ad yeqbel asuter-inek·inem send ad tizmireḍ ad ternuḍ ɣer ugraw-a. Mi ara d-tettusutreḍ ad ternuḍ, isem d tewlaft inek·inem ad ttwabḍun d yiεeggalen-is.</string>
   <plurals name="GroupJoinBottomSheetDialogFragment_group_dot_d_members">
@@ -788,9 +779,7 @@
   <string name="MediaOverviewActivity_Grid_view_description">Tamuɣli s tracca</string>
   <string name="MediaOverviewActivity_List_view_description">Timeẓri n tebdart</string>
   <string name="MediaOverviewActivity_Selected_description">Yettwafren</string>
-  <string name="MediaOverviewActivity_save">Sekles</string>
   <string name="MediaOverviewActivity_select_all">Fren akk</string>
-  <string name="MediaOverviewActivity_delete">Kkes</string>
   <string name="MediaOverviewActivity_file">Afaylu</string>
   <string name="MediaOverviewActivity_audio">Ameslaw</string>
   <string name="MediaOverviewActivity_video">Avidyu</string>
@@ -801,8 +790,8 @@
   <string name="MediaOverviewActivity_sent_by_s_to_s">Yettwazen-d sɣur %1$s i %2$s</string>
   <string name="MediaOverviewActivity_sent_by_you_to_s">Yettwazen-d sɣur-k·m i %1$s</string>
   <!--Megaphones-->
-  <string name="Megaphones_introducing_reactions">Aseddu n yisedmar</string>
-  <string name="Megaphones_tap_and_hold_any_message_to_quicky_share_how_you_feel">Sit syen ffer yal izen i usezreb n beṭṭu n wayen tettḥulfuḍ.</string>
+  <!-- Removed by excludeNonTranslatables <string name="Megaphones_introducing_reactions">Aseddu n yisedmar</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="Megaphones_tap_and_hold_any_message_to_quicky_share_how_you_feel">Sit syen ffer yal izen i usezreb n beṭṭu n wayen tettḥulfuḍ.</string> -->
   <string name="Megaphones_remind_me_later">Smektid ticki</string>
   <string name="Megaphones_verify_your_signal_pin">Senqed tangalt PIN n Signal</string>
   <string name="Megaphones_well_occasionally_ask_you_to_verify_your_pin">Sya ɣer da ad d-tettusutreḍ ad tesneqdeḍ tangalt-ik·im PIN i wakken ad as-tecfuḍ.</string>
@@ -1050,10 +1039,6 @@
   <plurals name="MessageRequestProfileView_members">
     <item quantity="one">%1$d n uɛeggal</item>
     <item quantity="other">%1$d n iɛeggalen</item>
-  </plurals>
-  <plurals name="MessageRequestProfileView_members_and_invited">
-    <item quantity="one">%1$d uεeggal (+%2$d yettwancad)</item>
-    <item quantity="other">%1$d yiεeggalen (+%2$d ttwancaden)</item>
   </plurals>
   <plurals name="MessageRequestProfileView_member_of_d_additional_groups">
     <item quantity="one">%d ugraw-nniḍen</item>
@@ -1384,7 +1369,7 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="UsernameEditFragment_usernames_cannot_begin_with_a_number">Ismawen n yiseqdacen ur zmiren ad bdun s umiḍan.</string>
   <string name="UsernameEditFragment_username_is_invalid">Isem n useqdac d arameɣtu.</string>
   <string name="UsernameEditFragment_usernames_must_be_between_a_and_b_characters">Ismawen n useqdac ilaq ad yili gar %1$d d %2$d n yisekkilen.</string>
-  <string name="UsernameEditFragment_usernames_on_signal_are_optional">Isemawen n yiseqdacen deg Signal d ifrayanen. Ma yella tferneḍ ad ternuḍ isem n useqdac, iseqdacen-nniḍen n Signal ad izmiren ad ak·akem-afen s yisem-a n useqdac syen ad ak·akem-id-remsen war ma ssnen uṭṭun-ik·im n tiliɣri.</string>
+  <!-- Removed by excludeNonTranslatables <string name="UsernameEditFragment_usernames_on_signal_are_optional">Isemawen n yiseqdacen deg Signal d ifrayanen. Ma yella tferneḍ ad ternuḍ isem n useqdac, iseqdacen-nniḍen n Signal ad izmiren ad ak·akem-afen s yisem-a n useqdac syen ad ak·akem-id-remsen war ma ssnen uṭṭun-ik·im n tiliɣri.</string> -->
   <plurals name="UserNotificationMigrationJob_d_contacts_are_on_signal">
     <item quantity="one">%d n unermis yella ɣef Signal!</item>
     <item quantity="other">%d n yinermisen llan ɣef Signal!</item>
@@ -2100,14 +2085,14 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="conversation_callable_secure__menu_call">Asiwel Signal</string>
   <string name="conversation_callable_secure__menu_video">Asiwel Signal s tvidyut</string>
   <!--conversation_context-->
-  <string name="conversation_context__menu_message_details">Talqayt n yizen</string>
-  <string name="conversation_context__menu_copy_text">Nɣel aḍris</string>
-  <string name="conversation_context__menu_delete_message">Kkes izen</string>
-  <string name="conversation_context__menu_forward_message">Ḍfer izen</string>
-  <string name="conversation_context__menu_resend_message">Azn izen i tikelt nniḍen</string>
-  <string name="conversation_context__menu_reply_to_message">Err i yizen</string>
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_message_details">Talqayt n yizen</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_copy_text">Nɣel aḍris</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_delete_message">Kkes izen</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_forward_message">Ḍfer izen</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_resend_message">Azn izen i tikelt nniḍen</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_reply_to_message">Err i yizen</string> -->
   <!--conversation_context_reacction-->
-  <string name="conversation_context__reaction_multi_select">Fren aṭas</string>
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__reaction_multi_select">Fren aṭas</string> -->
   <!--conversation_context_image-->
   <string name="conversation_context_image__save_attachment">Sekles taceqquft yaddan</string>
   <!--conversation_expiring_off-->
@@ -2190,7 +2175,7 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="Insights__title">Talqayt</string>
   <string name="InsightsDashboardFragment__title">Talqayt</string>
   <string name="InsightsDashboardFragment__signal_protocol_automatically_protected">Aneggaf n Signal yettummesten s wudem awurman %% %1$d seg yiznan-ik·im yeffɣen n wussan-a %2$d ineggura. Ameslay gar yiseqdacen n Signal zgan ttwawgelhen seg yixef ɣer yixef.</string>
-  <string name="InsightsDashboardFragment__boost_your_signal">Anerni n Signal</string>
+  <!-- Removed by excludeNonTranslatables <string name="InsightsDashboardFragment__boost_your_signal">Anerni n Signal</string> -->
   <string name="InsightsDashboardFragment__not_enough_data">ulac ddeqs n ysefka</string>
   <string name="InsightsDashboardFragment__your_insights_percentage_is_calculated_based_on">Afmiḍi-inek·inem Insights yettusiḍen almend n yiznan yeffɣen deg %1$d wussan ineggura ur nṛuḥ ara neɣ ur ttwakksen ara.</string>
   <string name="InsightsDashboardFragment__start_a_conversation">Bdu adiwenni</string>
@@ -2296,15 +2281,15 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="KbsMegaphone__pins_keep_information_thats_stored_with_signal_encrytped">Tingalin PIN ḥerrzent talɣut i yettukelsen s Signal yettwawgelhen.</string>
   <string name="KbsMegaphone__create_pin">Snulfu-d PIN</string>
   <!--Research Megaphone-->
-  <string name="ResearchMegaphone_tell_signal_what_you_think">Ini-yas i Signal d acu tettxemmimeḍ</string>
-  <string name="ResearchMegaphone_to_make_signal_the_best_messaging_app_on_the_planet">I wakken ad yili Signal d asnas n tirawt ifazen deg ddunit, nebɣa aṭas ad nẓer tamawt-ik·im.</string>
-  <string name="ResearchMegaphone_learn_more">Issin ugar</string>
-  <string name="ResearchMegaphone_dismiss">Zgel</string>
-  <string name="ResearchMegaphoneDialog_signal_research">Anadi n Signal</string>
-  <string name="ResearchMegaphoneDialog_we_believe_in_privacy"><![CDATA[<p><b>Nettamen s tbaḍnit.</b></p><p>Signal ur ak·akem-iṭṭafr ara, ur ileqqeḍ ara isefka-inek·inem. I usnerni n Signal i yal yiwen, nettkal ɣef tamawt n yiseqdac, <b>daɣen nebɣa aṭas tamawt-ik·im.</b></p><p>Nselkam tasestant i wakken ad nefhem amek tseqdaceḍ Signal. Tasestant-nneɣ ur tleqqeḍ ara ula d yiwen usefku ara ak·akem-id-ibegnen. Ma yella twalaḍ tebɣiḍ ad tebḍuḍ tamawt-nniḍen, ad tesεuḍ taxtiṛt ma yella ad tmuddeḍ talɣut n unermis.</p><p>Ma yella tesεiḍ kra n tesdatin d tamawt ara tmuddeḍ, nebɣa ad as-nsel sɣur-k·m.</p>]]></string>
-  <string name="ResearchMegaphoneDialog_take_the_survey">Ttekki deg tsestant</string>
-  <string name="ResearchMegaphoneDialog_no_thanks">Uhu tanemmirt</string>
-  <string name="ResearchMegaphoneDialog_the_survey_is_hosted_by_alchemer_at_the_secure_domain">Tasestant tettusezdeɣ s Alchemer deg talɣut taɣellsant surveys.signalusers.org</string>
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphone_tell_signal_what_you_think">Ini-yas i Signal d acu tettxemmimeḍ</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphone_to_make_signal_the_best_messaging_app_on_the_planet">I wakken ad yili Signal d asnas n tirawt ifazen deg ddunit, nebɣa aṭas ad nẓer tamawt-ik·im.</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphone_learn_more">Issin ugar</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphone_dismiss">Zgel</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphoneDialog_signal_research">Anadi n Signal</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphoneDialog_we_believe_in_privacy"><![CDATA[<p><b>Nettamen s tbaḍnit.</b></p><p>Signal ur ak·akem-iṭṭafr ara, ur ileqqeḍ ara isefka-inek·inem. I usnerni n Signal i yal yiwen, nettkal ɣef tamawt n yiseqdac, <b>daɣen nebɣa aṭas tamawt-ik·im.</b></p><p>Nselkam tasestant i wakken ad nefhem amek tseqdaceḍ Signal. Tasestant-nneɣ ur tleqqeḍ ara ula d yiwen usefku ara ak·akem-id-ibegnen. Ma yella twalaḍ tebɣiḍ ad tebḍuḍ tamawt-nniḍen, ad tesεuḍ taxtiṛt ma yella ad tmuddeḍ talɣut n unermis.</p><p>Ma yella tesεiḍ kra n tesdatin d tamawt ara tmuddeḍ, nebɣa ad as-nsel sɣur-k·m.</p>]]></string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphoneDialog_take_the_survey">Ttekki deg tsestant</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphoneDialog_no_thanks">Uhu tanemmirt</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ResearchMegaphoneDialog_the_survey_is_hosted_by_alchemer_at_the_secure_domain">Tasestant tettusezdeɣ s Alchemer deg talɣut taɣellsant surveys.signalusers.org</string> -->
   <!--transport_selection_list_item-->
   <string name="transport_selection_list_item__transport_icon">Tignit n usiweḍ</string>
   <string name="ConversationListFragment_loading">Asali…</string>
@@ -2354,7 +2339,7 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="BackupDialog_verify">Senqed</string>
   <string name="BackupDialog_you_successfully_entered_your_backup_passphrase">Teskecmeḍ tafyirt-ik·im tuffirt n uḥraz akken iwata</string>
   <string name="BackupDialog_passphrase_was_not_correct">Tafyirt tuffirt d tarameɣtut</string>
-  <string name="LocalBackupJob_creating_backup">Timerna n uḥraz…</string>
+  <!-- Removed by excludeNonTranslatables <string name="LocalBackupJob_creating_backup">Timerna n uḥraz…</string> -->
   <string name="LocalBackupJobApi29_backup_failed">Aḥraz ur yeddi ara</string>
   <string name="LocalBackupJobApi29_your_backup_directory_has_been_deleted_or_moved">Akaram-inek·inem n uḥraz yettwakkes neɣ yettusenkez.</string>
   <string name="LocalBackupJobApi29_your_backup_file_is_too_large">Afaylu-ik·im n uḥraz meqqar aṭas i wakken ad yettukles ɣef ubleɣ-a.</string>
@@ -2582,7 +2567,7 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="MultiShareDialogs__failed_to_send_to_some_users">Tuzna i kra n yiseqdacen ur teddi ara</string>
   <string name="MultiShareDialogs__you_can_only_share_with_up_to">Tzemreḍ kan ad tebḍuḍ alamma %1$d n yidiwenniyen</string>
   <!--ShareInterstitialActivity-->
-  <string name="ShareInterstitialActivity__forward_message">Ḍfer izen</string>
+  <!-- Removed by excludeNonTranslatables <string name="ShareInterstitialActivity__forward_message">Ḍfer izen</string> -->
   <!--ChatWallpaperActivity-->
   <string name="ChatWallpaperActivity__chat_wallpaper">Agilal n ugdil n udiwenni</string>
   <!--ChatWallpaperFragment-->
@@ -2701,8 +2686,8 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="EditReactionsFragment__reset">Wennez</string>
   <string name="EditReactionsFragment_save">Sekles</string>
   <!--ChatColorsMegaphone-->
-  <string name="ChatColorsMegaphone__appearance">Askan</string>
-  <string name="ChatColorsMegaphone__not_now">Mačči tura</string>
+  <!-- Removed by excludeNonTranslatables <string name="ChatColorsMegaphone__appearance">Askan</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="ChatColorsMegaphone__not_now">Mačči tura</string> -->
   <!--AddAProfilePhotoMegaphone-->
   <string name="AddAProfilePhotoMegaphone__not_now">Mačči tura</string>
   <!--KeyboardPagerFragment-->
@@ -2772,6 +2757,6 @@ i d-tefkiḍ (%s) ur yeɣti ara.</string>
   <string name="SubscribeThanksForYourSupportBottomSheetDialogFragment__done">Yemmed</string>
   <string name="ExpiredBadgeBottomSheetDialogFragment__not_now">Mačči tura</string>
   <string name="Subscription__contact_support">Tallalt n unermis</string>
-  <string name="DonationsErrors__payment_failed">Axelles yecceḍ</string>
+  <!-- Removed by excludeNonTranslatables <string name="DonationsErrors__payment_failed">Axelles yecceḍ</string> -->
   <!--EOF-->
 </resources>

@@ -11,11 +11,11 @@ import org.thoughtcrime.securesms.jobmanager.impl.NetworkConstraint;
 import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.subscription.Subscriber;
 import org.whispersystems.signalservice.api.subscriptions.ActiveSubscription;
-import org.whispersystems.signalservice.api.subscriptions.SubscriberId;
 import org.whispersystems.signalservice.internal.EmptyResponse;
 import org.whispersystems.signalservice.internal.ServiceResponse;
 
 import java.io.IOException;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -29,11 +29,26 @@ public class SubscriptionKeepAliveJob extends BaseJob {
   private static final String TAG         = Log.tag(SubscriptionKeepAliveJob.class);
   private static final long   JOB_TIMEOUT = TimeUnit.DAYS.toMillis(3);
 
-  public SubscriptionKeepAliveJob() {
+  public static void enqueueAndTrackTimeIfNecessary() {
+    long nextLaunchTime = SignalStore.donationsValues().getLastKeepAliveLaunchTime() + TimeUnit.DAYS.toMillis(3);
+    long now            = System.currentTimeMillis();
+
+    if (nextLaunchTime <= now) {
+      enqueueAndTrackTime(now);
+    }
+  }
+
+  public static void enqueueAndTrackTime(long now) {
+    ApplicationDependencies.getJobManager().add(new SubscriptionKeepAliveJob());
+    SignalStore.donationsValues().setLastKeepAliveLaunchTime(now);
+  }
+
+  private SubscriptionKeepAliveJob() {
     this(new Parameters.Builder()
                        .setQueue(KEY)
                        .addConstraint(NetworkConstraint.KEY)
                        .setMaxInstancesForQueue(1)
+                       .setMaxAttempts(Parameters.UNLIMITED)
                        .setLifespan(JOB_TIMEOUT)
                        .build());
   }
@@ -59,47 +74,86 @@ public class SubscriptionKeepAliveJob extends BaseJob {
 
   @Override
   protected void onRun() throws Exception {
+    synchronized (SubscriptionReceiptRequestResponseJob.MUTEX) {
+      doRun();
+    }
+  }
+
+  private void doRun() throws Exception {
     Subscriber subscriber = SignalStore.donationsValues().getSubscriber();
     if (subscriber == null) {
       return;
     }
 
     ServiceResponse<EmptyResponse> response = ApplicationDependencies.getDonationsService()
-                                                                     .putSubscription(subscriber.getSubscriberId())
-                                                                     .blockingGet();
+                                                                     .putSubscription(subscriber.getSubscriberId());
 
-    if (!response.getResult().isPresent()) {
-      if (response.getStatus() == 403) {
-        Log.w(TAG, "Response code 403, possibly corrupted subscription id.");
-        // TODO [alex] - Probably need some UX around this, or some kind of protocol.
-      }
-
-      throw new IOException("Failed to ping subscription service.");
-    }
+    verifyResponse(response);
+    Log.i(TAG, "Successful call to PUT subscription ID", true);
 
     ServiceResponse<ActiveSubscription> activeSubscriptionResponse = ApplicationDependencies.getDonationsService()
-                                                                                            .getSubscription(subscriber.getSubscriberId())
-                                                                                            .blockingGet();
+                                                                                            .getSubscription(subscriber.getSubscriberId());
 
-    if (!response.getResult().isPresent()) {
-      throw new IOException("Failed to perform active subscription check");
-    }
+    verifyResponse(activeSubscriptionResponse);
+    Log.i(TAG, "Successful call to GET active subscription", true);
 
     ActiveSubscription activeSubscription = activeSubscriptionResponse.getResult().get();
-    if (activeSubscription.getActiveSubscription() == null || !activeSubscription.getActiveSubscription().isActive()) {
-      Log.i(TAG, "User does not have an active subscription. Exiting.");
+    if (activeSubscription.getActiveSubscription() == null) {
+      Log.i(TAG, "User does not have a subscription. Exiting.", true);
+      return;
+    }
+
+    if (activeSubscription.isFailedPayment()) {
+      Log.i(TAG, "User has a subscription with a failed payment. Marking the payment failure. Status message: " + activeSubscription.getActiveSubscription().getStatus(), true);
+      SignalStore.donationsValues().setUnexpectedSubscriptionCancelationChargeFailure(activeSubscription.getChargeFailure());
+      SignalStore.donationsValues().setUnexpectedSubscriptionCancelationReason(activeSubscription.getActiveSubscription().getStatus());
+      SignalStore.donationsValues().setUnexpectedSubscriptionCancelationTimestamp(activeSubscription.getActiveSubscription().getEndOfCurrentPeriod());
+      return;
+    }
+
+    if (!activeSubscription.getActiveSubscription().isActive()) {
+      Log.i(TAG, "User has an inactive subscription. Status message: " + activeSubscription.getActiveSubscription().getStatus() + " Exiting.", true);
       return;
     }
 
     if (activeSubscription.getActiveSubscription().getEndOfCurrentPeriod() > SignalStore.donationsValues().getLastEndOfPeriod()) {
-      Log.i(TAG, "Last end of period change. Requesting receipt refresh.");
-      SubscriptionReceiptRequestResponseJob.enqueueSubscriptionContinuation();
+      Log.i(TAG,
+            String.format(Locale.US,
+                          "Last end of period change. Requesting receipt refresh. (old: %d to new: %d)",
+                          SignalStore.donationsValues().getLastEndOfPeriod(),
+                          activeSubscription.getActiveSubscription().getEndOfCurrentPeriod()),
+            true);
+
+      SubscriptionReceiptRequestResponseJob.createSubscriptionContinuationJobChain(true).enqueue();
+      return;
+    }
+
+    Log.i(TAG, "Subscription is active, and end of current period (remote) is after the latest checked end of period (local). Nothing to do.");
+  }
+
+  private <T> void verifyResponse(@NonNull ServiceResponse<T> response) throws Exception {
+    if (response.getExecutionError().isPresent()) {
+      Log.w(TAG, "Failed with an execution error. Scheduling retry.", response.getExecutionError().get(), true);
+      throw new RetryableException();
+    } else if (response.getApplicationError().isPresent()) {
+      switch (response.getStatus()) {
+        case 403:
+        case 404:
+          Log.w(TAG, "Invalid or malformed subscriber id. Status: " + response.getStatus(), response.getApplicationError().get(), true);
+          throw new IOException();
+        default:
+          Log.w(TAG, "An unknown server error occurred: " + response.getStatus(), response.getApplicationError().get(), true);
+          throw new RetryableException();
+      }
     }
   }
 
   @Override
   protected boolean onShouldRetry(@NonNull Exception e) {
-    return true;
+    return e instanceof RetryableException;
+  }
+
+  private static class RetryableException extends Exception {
   }
 
   public static class Factory implements Job.Factory<SubscriptionKeepAliveJob> {

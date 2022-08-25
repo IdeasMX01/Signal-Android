@@ -47,14 +47,13 @@ import com.google.i18n.phonenumbers.Phonenumber;
 
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.BuildConfig;
+import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.components.ComposeText;
 import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.mms.OutgoingLegacyMmsConnection;
-import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -64,6 +63,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 public class Util {
@@ -153,12 +153,16 @@ public class Util {
     return collection == null || collection.isEmpty();
   }
 
-  public static boolean isEmpty(@Nullable String value) {
-    return value == null || value.length() == 0;
+  public static boolean isEmpty(@Nullable CharSequence charSequence) {
+    return charSequence == null || charSequence.length() == 0;
   }
 
   public static boolean hasItems(@Nullable Collection<?> collection) {
     return collection != null && !collection.isEmpty();
+  }
+
+  public static <K, V> boolean hasItems(@Nullable Map<K, V> map) {
+    return map != null && !map.isEmpty();
   }
 
   public static <K, V> V getOrDefault(@NonNull Map<K, V> map, K key, V defaultValue) {
@@ -180,17 +184,6 @@ public class Util {
 
   public static @NonNull CharSequence emptyIfNull(@Nullable CharSequence value) {
     return value != null ? value : "";
-  }
-
-  public static <E> List<List<E>> chunk(@NonNull List<E> list, int chunkSize) {
-    List<List<E>> chunks = new ArrayList<>(list.size() / chunkSize);
-
-    for (int i = 0; i < list.size(); i += chunkSize) {
-      List<E> chunk = list.subList(i, Math.min(list.size(), i + chunkSize));
-      chunks.add(chunk);
-    }
-
-    return chunks;
   }
 
   public static CharSequence getBoldedString(String value) {
@@ -245,19 +238,19 @@ public class Util {
       final String           localNumber = ((TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE)).getLine1Number();
       final Optional<String> countryIso  = getSimCountryIso(context);
 
-      if (TextUtils.isEmpty(localNumber)) return Optional.absent();
-      if (!countryIso.isPresent())        return Optional.absent();
+      if (TextUtils.isEmpty(localNumber)) return Optional.empty();
+      if (!countryIso.isPresent())        return Optional.empty();
 
-      return Optional.fromNullable(PhoneNumberUtil.getInstance().parse(localNumber, countryIso.get()));
+      return Optional.ofNullable(PhoneNumberUtil.getInstance().parse(localNumber, countryIso.get()));
     } catch (NumberParseException e) {
       Log.w(TAG, e);
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 
   public static Optional<String> getSimCountryIso(Context context) {
     String simCountryIso = ((TelephonyManager)context.getSystemService(Context.TELEPHONY_SERVICE)).getSimCountryIso();
-    return Optional.fromNullable(simCountryIso != null ? simCountryIso.toUpperCase() : null);
+    return Optional.ofNullable(simCountryIso != null ? simCountryIso.toUpperCase() : null);
   }
 
   public static @NonNull <T> T firstNonNull(@Nullable T optional, @NonNull T fallback) {
@@ -445,6 +438,15 @@ public class Util {
     return Math.min(Math.max(value, min), max);
   }
 
+  /**
+   * Returns half of the difference between the given length, and the length when scaled by the
+   * given scale.
+   */
+  public static float halfOffsetFromScale(int length, float scale) {
+    float scaledLength = length * scale;
+    return (length - scaledLength) / 2;
+  }
+
   public static @Nullable String readTextFromClipboard(@NonNull Context context) {
     {
       ClipboardManager clipboardManager = (ClipboardManager)context.getSystemService(Context.CLIPBOARD_SERVICE);
@@ -458,10 +460,13 @@ public class Util {
   }
 
   public static void writeTextToClipboard(@NonNull Context context, @NonNull String text) {
-    {
-      ClipboardManager clipboardManager = (ClipboardManager)context.getSystemService(Context.CLIPBOARD_SERVICE);
-      clipboardManager.setPrimaryClip(ClipData.newPlainText("Safety numbers", text));
-    }
+    writeTextToClipboard(context, context.getString(R.string.app_name), text);
+  }
+
+  public static void writeTextToClipboard(@NonNull Context context, @NonNull String label, @NonNull String text) {
+    android.content.ClipboardManager clipboard = (android.content.ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+    ClipData clip = ClipData.newPlainText(label, text);
+    clipboard.setPrimaryClip(clip);
   }
 
   public static int toIntExact(long value) {
@@ -469,11 +474,6 @@ public class Util {
       throw new ArithmeticException("integer overflow");
     }
     return (int)value;
-  }
-
-  public static boolean isStringEquals(String first, String second) {
-    if (first == null) return second == null;
-    return first.equals(second);
   }
 
   public static boolean isEquals(@Nullable Long first, long second) {
@@ -514,32 +514,5 @@ public class Util {
     } catch (NumberFormatException e) {
       return defaultValue;
     }
-  }
-
-  /**
-   * Appends the stack trace of the provided throwable onto the provided primary exception. This is
-   * useful for when exceptions are thrown inside of asynchronous systems (like runnables in an
-   * executor) where you'd otherwise lose important parts of the stack trace. This lets you save a
-   * throwable at the entry point, and then combine it with any caught exceptions later.
-   *
-   * @return The provided primary exception, for convenience.
-   */
-  public static RuntimeException appendStackTrace(@NonNull RuntimeException primary, @NonNull Throwable secondary) {
-    StackTraceElement[] now      = primary.getStackTrace();
-    StackTraceElement[] then     = secondary.getStackTrace();
-    StackTraceElement[] combined = new StackTraceElement[now.length + then.length];
-
-    System.arraycopy(now, 0, combined, 0, now.length);
-    System.arraycopy(then, 0, combined, now.length, then.length);
-
-    primary.setStackTrace(combined);
-
-    return primary;
-  }
-
-  public static @NonNull String convertThrowableToString(@NonNull Throwable throwable) {
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    throwable.printStackTrace(new PrintStream(outputStream));
-    return outputStream.toString();
   }
 }

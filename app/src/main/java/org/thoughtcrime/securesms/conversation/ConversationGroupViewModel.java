@@ -15,9 +15,9 @@ import androidx.lifecycle.ViewModelProvider;
 import com.annimon.stream.Stream;
 
 import org.signal.core.util.concurrent.SignalExecutors;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
 import org.thoughtcrime.securesms.database.GroupDatabase.GroupRecord;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.groups.GroupChangeBusyException;
 import org.thoughtcrime.securesms.groups.GroupChangeFailedException;
@@ -26,17 +26,22 @@ import org.thoughtcrime.securesms.groups.GroupManager;
 import org.thoughtcrime.securesms.groups.GroupsV1MigrationUtil;
 import org.thoughtcrime.securesms.groups.ui.GroupChangeFailureReason;
 import org.thoughtcrime.securesms.groups.ui.invitesandrequests.invite.GroupLinkInviteFriendsBottomSheetDialogFragment;
+import org.thoughtcrime.securesms.groups.v2.GroupBlockJoinRequestResult;
+import org.thoughtcrime.securesms.groups.v2.GroupManagementRepository;
 import org.thoughtcrime.securesms.profiles.spoofing.ReviewRecipient;
 import org.thoughtcrime.securesms.profiles.spoofing.ReviewUtil;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.recipients.RecipientId;
 import org.thoughtcrime.securesms.util.AsynchronousCallback;
-import org.thoughtcrime.securesms.util.concurrent.SimpleTask;
+import org.signal.core.util.concurrent.SimpleTask;
 import org.thoughtcrime.securesms.util.livedata.LiveDataUtil;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.core.Single;
 
 final class ConversationGroupViewModel extends ViewModel {
 
@@ -46,11 +51,13 @@ final class ConversationGroupViewModel extends ViewModel {
   private final LiveData<Integer>                   actionableRequestingMembers;
   private final LiveData<ReviewState>               reviewState;
   private final LiveData<List<RecipientId>>         gv1MigrationSuggestions;
+  private final GroupManagementRepository           groupManagementRepository;
 
   private boolean firstTimeInviteFriendsTriggered;
 
   private ConversationGroupViewModel() {
-    this.liveRecipient = new MutableLiveData<>();
+    this.liveRecipient             = new MutableLiveData<>();
+    this.groupManagementRepository = new GroupManagementRepository();
 
     LiveData<GroupRecord>     groupRecord = LiveDataUtil.mapAsync(liveRecipient, ConversationGroupViewModel::getGroupRecordForRecipient);
     LiveData<List<Recipient>> duplicates  = LiveDataUtil.mapAsync(groupRecord, record -> {
@@ -81,7 +88,7 @@ final class ConversationGroupViewModel extends ViewModel {
   void onSuggestedMembersBannerDismissed(@NonNull GroupId groupId, @NonNull List<RecipientId> suggestions) {
     SignalExecutors.BOUNDED.execute(() -> {
       if (groupId.isV2()) {
-        DatabaseFactory.getGroupDatabase(ApplicationDependencies.getApplication()).removeUnmigratedV1Members(groupId.requireV2(), suggestions);
+        SignalDatabase.groups().removeUnmigratedV1Members(groupId.requireV2(), suggestions);
         liveRecipient.postValue(liveRecipient.getValue());
       }
     });
@@ -118,8 +125,8 @@ final class ConversationGroupViewModel extends ViewModel {
   private static @Nullable GroupRecord getGroupRecordForRecipient(@Nullable Recipient recipient) {
     if (recipient != null && recipient.isGroup()) {
       Application context         = ApplicationDependencies.getApplication();
-      GroupDatabase groupDatabase = DatabaseFactory.getGroupDatabase(context);
-      return groupDatabase.getGroup(recipient.getId()).orNull();
+      GroupDatabase groupDatabase = SignalDatabase.groups();
+      return groupDatabase.getGroup(recipient.getId()).orElse(null);
     } else {
       return null;
     }
@@ -198,9 +205,9 @@ final class ConversationGroupViewModel extends ViewModel {
 
     firstTimeInviteFriendsTriggered = true;
 
-    SimpleTask.run(() -> DatabaseFactory.getGroupDatabase(ApplicationDependencies.getApplication())
-                                        .requireGroup(groupId)
-                                        .getMembers().equals(Collections.singletonList(Recipient.self().getId())),
+    SimpleTask.run(() -> SignalDatabase.groups()
+                                       .requireGroup(groupId)
+                                       .getMembers().equals(Collections.singletonList(Recipient.self().getId())),
                    justSelf -> {
                      if (justSelf) {
                        inviteFriends(supportFragmentManager, groupId);
@@ -211,6 +218,11 @@ final class ConversationGroupViewModel extends ViewModel {
 
   void inviteFriends(@NonNull FragmentManager supportFragmentManager, @NonNull GroupId.V2 groupId) {
     GroupLinkInviteFriendsBottomSheetDialogFragment.show(supportFragmentManager, groupId);
+  }
+
+  public Single<GroupBlockJoinRequestResult> blockJoinRequests(@NonNull Recipient groupRecipient, @NonNull Recipient recipient) {
+    return groupManagementRepository.blockJoinRequests(groupRecipient.requireGroupId().requireV2(), recipient)
+        .observeOn(AndroidSchedulers.mainThread());
   }
 
   static final class ReviewState {

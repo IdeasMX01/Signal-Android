@@ -8,12 +8,12 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
 import org.thoughtcrime.securesms.R;
+import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.util.TextSecurePreferences;
 
 @SuppressLint("BatteryLife")
@@ -31,18 +31,13 @@ public class DozeReminder extends Reminder {
       context.startActivity(intent);
     });
 
-    setDismissListener(new View.OnClickListener() {
-      @Override
-      public void onClick(View v) {
-        TextSecurePreferences.setPromptedOptimizeDoze(context, true);
-      }
-    });
+    setDismissListener(v -> TextSecurePreferences.setPromptedOptimizeDoze(context, true));
   }
 
   public static boolean isEligible(Context context) {
-    return TextSecurePreferences.isFcmDisabled(context)            &&
+    return !SignalStore.account().isFcmEnabled()                   &&
            !TextSecurePreferences.hasPromptedOptimizeDoze(context) &&
-           Build.VERSION.SDK_INT >= Build.VERSION_CODES.M          &&
+           Build.VERSION.SDK_INT >= 23                             &&
            !((PowerManager)context.getSystemService(Context.POWER_SERVICE)).isIgnoringBatteryOptimizations(context.getPackageName());
   }
 

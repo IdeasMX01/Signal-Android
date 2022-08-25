@@ -11,19 +11,20 @@ import android.telephony.SmsManager;
 import androidx.annotation.NonNull;
 
 import org.signal.core.util.logging.Log;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessageDatabase;
 import org.thoughtcrime.securesms.database.NoSuchMessageException;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.model.SmsMessageRecord;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.jobmanager.Data;
 import org.thoughtcrime.securesms.jobmanager.Job;
 import org.thoughtcrime.securesms.jobmanager.impl.NetworkOrCellServiceConstraint;
+import org.thoughtcrime.securesms.keyvalue.SignalStore;
+import org.thoughtcrime.securesms.notifications.v2.ConversationId;
 import org.thoughtcrime.securesms.phonenumbers.NumberUtil;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.service.SmsDeliveryListener;
 import org.thoughtcrime.securesms.transport.UndeliverableMessageException;
-import org.thoughtcrime.securesms.util.TextSecurePreferences;
 
 import java.util.ArrayList;
 
@@ -68,7 +69,7 @@ public class SmsSendJob extends SendJob {
 
   @Override
   public void onAdded() {
-    DatabaseFactory.getSmsDatabase(context).markAsSending(messageId);
+    SignalDatabase.sms().markAsSending(messageId);
   }
 
   @Override
@@ -78,7 +79,7 @@ public class SmsSendJob extends SendJob {
       throw new TooManyRetriesException();
     }
 
-    MessageDatabase  database = DatabaseFactory.getSmsDatabase(context);
+    MessageDatabase  database = SignalDatabase.sms();
     SmsMessageRecord record   = database.getSmsMessage(messageId);
 
     if (!record.isPending() && !record.isFailed()) {
@@ -96,8 +97,8 @@ public class SmsSendJob extends SendJob {
       log(TAG, String.valueOf(record.getDateSent()), "Sent message: " + messageId);
     } catch (UndeliverableMessageException ude) {
       warn(TAG, ude);
-      DatabaseFactory.getSmsDatabase(context).markAsSentFailed(record.getId());
-      ApplicationDependencies.getMessageNotifier().notifyMessageDeliveryFailed(context, record.getRecipient(), record.getThreadId());
+      SignalDatabase.sms().markAsSentFailed(record.getId());
+      ApplicationDependencies.getMessageNotifier().notifyMessageDeliveryFailed(context, record.getRecipient(), ConversationId.fromMessageRecord(record));
     }
   }
 
@@ -109,13 +110,15 @@ public class SmsSendJob extends SendJob {
   @Override
   public void onFailure() {
     warn(TAG, "onFailure() messageId: " + messageId);
-    long      threadId  = DatabaseFactory.getSmsDatabase(context).getThreadIdForMessage(messageId);
-    Recipient recipient = DatabaseFactory.getThreadDatabase(context).getRecipientForThreadId(threadId);
+    long      threadId  = SignalDatabase.sms().getThreadIdForMessage(messageId);
+    Recipient recipient = SignalDatabase.threads().getRecipientForThreadId(threadId);
 
-    DatabaseFactory.getSmsDatabase(context).markAsSentFailed(messageId);
+    SignalDatabase.sms().markAsSentFailed(messageId);
 
     if (threadId != -1 && recipient != null) {
-      ApplicationDependencies.getMessageNotifier().notifyMessageDeliveryFailed(context, recipient, threadId);
+      ApplicationDependencies.getMessageNotifier().notifyMessageDeliveryFailed(context, recipient, ConversationId.forConversation(threadId));
+    } else {
+      Log.w(TAG, "Could not find message! threadId: " + threadId + ", recipient: " + (recipient != null ? recipient.getId().toString() : "null"));
     }
   }
 
@@ -140,7 +143,8 @@ public class SmsSendJob extends SendJob {
       throw new UndeliverableMessageException("Not a valid SMS destination! " + recipient);
     }
 
-    ArrayList<String> messages                = SmsManager.getDefault().divideMessage(message.getBody());
+    SmsManager               smsManager       = getSmsManagerFor(message.getSubscriptionId());
+    ArrayList<String>        messages         = smsManager.divideMessage(message.getBody());
     ArrayList<PendingIntent> sentIntents      = constructSentIntents(message.getId(), message.getType(), messages);
     ArrayList<PendingIntent> deliveredIntents = constructDeliveredIntents(message.getId(), message.getType(), messages);
 
@@ -149,7 +153,7 @@ public class SmsSendJob extends SendJob {
     // catching it and marking the message as a failure.  That way at least it doesn't
     // repeatedly crash every time you start the app.
     try {
-      getSmsManagerFor(message.getSubscriptionId()).sendMultipartTextMessage(recipient, null, messages, sentIntents, deliveredIntents);
+      smsManager.sendMultipartTextMessage(recipient, null, messages, sentIntents, deliveredIntents);
     } catch (NullPointerException | IllegalArgumentException npe) {
       warn(TAG, npe);
       log(TAG, String.valueOf(message.getDateSent()), "Recipient: " + recipient);
@@ -157,9 +161,8 @@ public class SmsSendJob extends SendJob {
 
       try {
         for (int i=0;i<messages.size();i++) {
-          getSmsManagerFor(message.getSubscriptionId()).sendTextMessage(recipient, null, messages.get(i),
-                                                                        sentIntents.get(i),
-                                                                        deliveredIntents == null ? null : deliveredIntents.get(i));
+          smsManager.sendTextMessage(recipient, null, messages.get(i), sentIntents.get(i),
+                                     deliveredIntents == null ? null : deliveredIntents.get(i));
         }
       } catch (NullPointerException | IllegalArgumentException npe2) {
         warn(TAG, npe);
@@ -186,7 +189,7 @@ public class SmsSendJob extends SendJob {
   }
 
   private ArrayList<PendingIntent> constructDeliveredIntents(long messageId, long type, ArrayList<String> messages) {
-    if (!TextSecurePreferences.isSmsDeliveryReportsEnabled(context)) {
+    if (!SignalStore.settings().isSmsDeliveryReportsEnabled()) {
       return null;
     }
 

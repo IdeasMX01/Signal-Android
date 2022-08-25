@@ -21,13 +21,11 @@ import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
-import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -53,10 +51,16 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.animation.DepthPageTransformer;
 import org.thoughtcrime.securesms.attachments.DatabaseAttachment;
 import org.thoughtcrime.securesms.components.viewpager.ExtendedOnPageChangedListener;
+import org.thoughtcrime.securesms.components.voice.VoiceNoteMediaController;
+import org.thoughtcrime.securesms.components.voice.VoiceNoteMediaControllerOwner;
+import org.thoughtcrime.securesms.conversation.mutiselect.forward.MultiselectForwardFragment;
+import org.thoughtcrime.securesms.conversation.mutiselect.forward.MultiselectForwardFragmentArgs;
 import org.thoughtcrime.securesms.database.MediaDatabase;
 import org.thoughtcrime.securesms.database.MediaDatabase.MediaRecord;
 import org.thoughtcrime.securesms.database.loaders.PagingMediaLoader;
@@ -69,10 +73,10 @@ import org.thoughtcrime.securesms.mms.PartAuthority;
 import org.thoughtcrime.securesms.permissions.Permissions;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.recipients.RecipientId;
-import org.thoughtcrime.securesms.sharing.ShareActivity;
 import org.thoughtcrime.securesms.util.AttachmentUtil;
 import org.thoughtcrime.securesms.util.DateUtils;
 import org.thoughtcrime.securesms.util.FullscreenHelper;
+import org.thoughtcrime.securesms.util.MediaUtil;
 import org.thoughtcrime.securesms.util.SaveAttachmentTask;
 import org.thoughtcrime.securesms.util.SaveAttachmentTask.Attachment;
 import org.thoughtcrime.securesms.util.StorageUtil;
@@ -88,7 +92,8 @@ import java.util.Objects;
 public final class MediaPreviewActivity extends PassphraseRequiredActivity
   implements LoaderManager.LoaderCallbacks<Pair<Cursor, Integer>>,
              MediaRailAdapter.RailItemListener,
-             MediaPreviewFragment.Events
+             MediaPreviewFragment.Events,
+             VoiceNoteMediaControllerOwner
 {
 
   private final static String TAG = Log.tag(MediaPreviewActivity.class);
@@ -128,6 +133,8 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
   private MediaDatabase.Sorting sorting;
   private FullscreenHelper      fullscreenHelper;
 
+  private VoiceNoteMediaController voiceNoteMediaController;
+
   private @Nullable Cursor cursor = null;
 
   public static @NonNull Intent intentFromMediaRecord(@NonNull Context context,
@@ -160,6 +167,7 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
 
     setSupportActionBar(findViewById(R.id.toolbar));
 
+    voiceNoteMediaController = new VoiceNoteMediaController(this);
     viewModel = ViewModelProviders.of(this).get(MediaPreviewViewModel.class);
 
     fullscreenHelper = new FullscreenHelper(this);
@@ -204,23 +212,25 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     else                                  from = "";
 
     if (showThread) {
-      String    to              = null;
+      String    titleText       = null;
       Recipient threadRecipient = mediaItem.threadRecipient;
 
       if (threadRecipient != null) {
-        if (mediaItem.outgoing || threadRecipient.isGroup()) {
+        if (mediaItem.outgoing) {
           if (threadRecipient.isSelf()) {
-            from = getString(R.string.note_to_self);
+            titleText = getString(R.string.note_to_self);
           } else {
-            to = threadRecipient.getDisplayName(this);
+            titleText = getString(R.string.MediaPreviewActivity_you_to_s, threadRecipient.getDisplayName(this));
           }
         } else {
-          to = getString(R.string.MediaPreviewActivity_you);
+          if (threadRecipient.isGroup()) {
+            titleText = getString(R.string.MediaPreviewActivity_s_to_s, from, threadRecipient.getDisplayName(this));
+          } else {
+            titleText = getString(R.string.MediaPreviewActivity_s_to_you, from);
+          }
         }
       }
-
-      return to != null ? getString(R.string.MediaPreviewActivity_s_to_s, from, to)
-                        : from;
+      return titleText != null ? titleText : from;
     } else {
       return from;
     }
@@ -287,7 +297,7 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
 
     anchorMarginsToBottomInsets(detailsContainer);
 
-    fullscreenHelper.configureToolbarSpacer(findViewById(R.id.toolbar_cutout_spacer));
+    fullscreenHelper.configureToolbarLayout(findViewById(R.id.toolbar_cutout_spacer), findViewById(R.id.toolbar));
 
     fullscreenHelper.showAndHideWithSystemUI(getWindow(), detailsContainer, toolbarLayout);
   }
@@ -387,10 +397,13 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     MediaItem mediaItem = getCurrentMediaItem();
 
     if (mediaItem != null) {
-      Intent composeIntent = new Intent(this, ShareActivity.class);
-      composeIntent.putExtra(Intent.EXTRA_STREAM, mediaItem.uri);
-      composeIntent.setType(mediaItem.type);
-      startActivity(composeIntent);
+      MultiselectForwardFragmentArgs.create(
+          this,
+          threadId,
+          mediaItem.uri,
+          mediaItem.type,
+          args -> MultiselectForwardFragment.showBottomSheet(getSupportFragmentManager(), args)
+      );
     }
   }
 
@@ -453,7 +466,7 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
       return;
     }
 
-    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+    AlertDialog.Builder builder = new MaterialAlertDialogBuilder(this);
     builder.setIcon(R.drawable.ic_warning);
     builder.setTitle(R.string.MediaPreviewActivity_media_delete_confirmation_title);
     builder.setMessage(R.string.MediaPreviewActivity_media_delete_confirmation_message);
@@ -534,7 +547,7 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
   }
 
   public static boolean isContentTypeSupported(final String contentType) {
-    return contentType != null && (contentType.startsWith("image/") || contentType.startsWith("video/"));
+    return MediaUtil.isImageType(contentType) || MediaUtil.isVideoType(contentType);
   }
 
   @Override
@@ -554,37 +567,30 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
       }
       cursor = Objects.requireNonNull(data.first);
 
-      int mediaPosition = Objects.requireNonNull(data.second);
-
-      CursorPagerAdapter adapter = new CursorPagerAdapter(getSupportFragmentManager(),this, cursor, mediaPosition, leftIsRecent);
-      mediaPager.setAdapter(adapter);
-      adapter.setActive(true);
-
       viewModel.setCursor(this, cursor, leftIsRecent);
 
-      int item = restartItem >= 0 ? restartItem : mediaPosition;
-      mediaPager.setCurrentItem(item);
+      int mediaPosition = Objects.requireNonNull(data.second);
 
-      if (item == 0) {
-        viewPagerListener.onPageSelected(0);
+      CursorPagerAdapter oldAdapter = (CursorPagerAdapter) mediaPager.getAdapter();
+      if (oldAdapter == null) {
+        CursorPagerAdapter adapter = new CursorPagerAdapter(getSupportFragmentManager(), this, cursor, mediaPosition, leftIsRecent);
+        mediaPager.setAdapter(adapter);
+        adapter.setActive(true);
+      } else {
+        oldAdapter.setCursor(cursor, mediaPosition);
+        oldAdapter.setActive(true);
       }
 
-      cursor.registerContentObserver(new ContentObserver(new Handler(getMainLooper())) {
-        @Override
-        public void onChange(boolean selfChange) {
-          onMediaChange();
+      if (oldAdapter == null || restartItem >= 0) {
+        int item = restartItem >= 0 ? restartItem : mediaPosition;
+        mediaPager.setCurrentItem(item);
+
+        if (item == 0) {
+          viewPagerListener.onPageSelected(0);
         }
-      });
+      }
     } else {
       mediaNotAvailable();
-    }
-  }
-
-  private void onMediaChange() {
-    MediaItemAdapter adapter = (MediaItemAdapter) mediaPager.getAdapter();
-
-    if (adapter != null) {
-      adapter.checkMedia(mediaPager.getCurrentItem());
     }
   }
 
@@ -605,6 +611,15 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     finish();
   }
 
+  @Override
+  public void onMediaReady() {
+  }
+
+  @Override
+  public @NonNull VoiceNoteMediaController getVoiceNoteMediaController() {
+    return voiceNoteMediaController;
+  }
+
   private class ViewPagerListener extends ExtendedOnPageChangedListener {
 
     @Override
@@ -615,7 +630,10 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
 
       if (adapter != null) {
         MediaItem item = adapter.getMediaItemFor(position);
-        if (item.recipient != null) item.recipient.live().observe(MediaPreviewActivity.this, r -> initializeActionBar());
+        if (item != null && item.recipient != null) {
+          item.recipient.live().observe(MediaPreviewActivity.this, r -> initializeActionBar());
+        }
+
         viewModel.setActiveAlbumRailItem(MediaPreviewActivity.this, position);
         initializeActionBar();
       }
@@ -628,7 +646,9 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
 
       if (adapter != null) {
         MediaItem item = adapter.getMediaItemFor(position);
-        if (item.recipient != null) item.recipient.live().removeObservers(MediaPreviewActivity.this);
+        if (item != null && item.recipient != null) {
+          item.recipient.live().removeObservers(MediaPreviewActivity.this);
+        }
 
         adapter.pause(position);
       }
@@ -678,7 +698,7 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     }
 
     @Override
-    public MediaItem getMediaItemFor(int position) {
+    public @Nullable MediaItem getMediaItemFor(int position) {
       return new MediaItem(null, null, null, uri, mediaType, -1, true);
     }
 
@@ -700,11 +720,6 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     @Override
     public boolean hasFragmentFor(int position) {
       return mediaPreviewFragment != null;
-    }
-
-    @Override
-    public void checkMedia(int currentItem) {
-
     }
   }
 
@@ -729,10 +744,10 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     private final Map<Integer, MediaPreviewFragment> mediaFragments = new HashMap<>();
 
     private final Context context;
-    private final Cursor  cursor;
     private final boolean leftIsRecent;
 
     private boolean active;
+    private Cursor  cursor;
     private int     autoPlayPosition;
 
     CursorPagerAdapter(@NonNull FragmentManager fragmentManager,
@@ -751,6 +766,11 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     public void setActive(boolean active) {
       this.active = active;
       notifyDataSetChanged();
+    }
+
+    public void setCursor(@NonNull Cursor cursor, int autoPlayPosition) {
+      this.cursor           = cursor;
+      this.autoPlayPosition = autoPlayPosition;
     }
 
     @Override
@@ -789,8 +809,15 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
       super.destroyItem(container, position, object);
     }
 
-    public MediaItem getMediaItemFor(int position) {
-      cursor.moveToPosition(getCursorPosition(position));
+    public @Nullable MediaItem getMediaItemFor(int position) {
+      int cursorPosition = getCursorPosition(position);
+
+      if (cursor.isClosed() || cursorPosition < 0) {
+        Log.w(TAG, "Invalid cursor state! Closed: " + cursor.isClosed() + " Position: " + cursorPosition);
+        return null;
+      }
+
+      cursor.moveToPosition(cursorPosition);
 
       MediaRecord        mediaRecord       = MediaRecord.from(context, cursor);
       DatabaseAttachment attachment        = Objects.requireNonNull(mediaRecord.getAttachment());
@@ -822,14 +849,6 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
     @Override
     public boolean hasFragmentFor(int position) {
       return mediaFragments.containsKey(position);
-    }
-
-    @Override
-    public void checkMedia(int position) {
-      MediaPreviewFragment fragment = mediaFragments.get(position);
-      if (fragment != null) {
-        fragment.checkMediaStillAvailable();
-      }
     }
 
     private int getCursorPosition(int position) {
@@ -866,10 +885,9 @@ public final class MediaPreviewActivity extends PassphraseRequiredActivity
   }
 
   interface MediaItemAdapter {
-    MediaItem getMediaItemFor(int position);
+    @Nullable MediaItem getMediaItemFor(int position);
     void pause(int position);
     @Nullable View getPlaybackControls(int position);
     boolean hasFragmentFor(int position);
-    void checkMedia(int currentItem);
   }
 }

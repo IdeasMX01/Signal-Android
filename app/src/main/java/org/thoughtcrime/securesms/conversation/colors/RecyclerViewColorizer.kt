@@ -79,6 +79,7 @@ class RecyclerViewColorizer(private val recyclerView: RecyclerView) {
     }
 
     private val colorPaint = Paint()
+    private val outOfBoundsPaint = Paint()
 
     override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView, state: RecyclerView.State) {
       outRect.setEmpty()
@@ -98,8 +99,10 @@ class RecyclerViewColorizer(private val recyclerView: RecyclerView) {
         if (child != null) {
           val holder = parent.getChildViewHolder(child)
           if (holder is Colorizable) {
-            holder.getColorizerProjections(parent).forEach {
-              c.drawPath(it.path, holePunchPaint)
+            holder.getColorizerProjections(parent).use { list ->
+              list.forEach {
+                c.drawPath(it.path, holePunchPaint)
+              }
             }
           }
         }
@@ -128,6 +131,17 @@ class RecyclerViewColorizer(private val recyclerView: RecyclerView) {
           parent.width.toFloat(),
           parent.height.toFloat(),
           colorPaint
+        )
+
+        val color = chatColors.asSingleColor()
+
+        outOfBoundsPaint.color = color
+        canvas.drawRect(
+          0f, -parent.height.toFloat(), parent.width.toFloat(), 0f, outOfBoundsPaint
+        )
+
+        canvas.drawRect(
+          0f, parent.height.toFloat(), parent.width.toFloat(), parent.height * 2f, outOfBoundsPaint
         )
       }
     }

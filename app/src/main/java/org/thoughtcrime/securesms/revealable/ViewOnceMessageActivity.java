@@ -99,7 +99,7 @@ public class ViewOnceMessageActivity extends PassphraseRequiredActivity implemen
   private void initViewModel(long messageId, @NonNull Uri uri) {
     ViewOnceMessageRepository repository = new ViewOnceMessageRepository(this);
 
-    viewModel = ViewModelProviders.of(this, new ViewOnceMessageViewModel.Factory(getApplication(), messageId, repository))
+    viewModel = ViewModelProviders.of(this, new ViewOnceMessageViewModel.Factory(messageId, repository))
                                   .get(ViewOnceMessageViewModel.class);
 
     viewModel.getMessage().observe(this, (message) -> {
@@ -131,7 +131,7 @@ public class ViewOnceMessageActivity extends PassphraseRequiredActivity implemen
 
     video.setWindow(getWindow());
     video.setPlayerStateCallbacks(this);
-    video.setVideoSource(videoSlide, true);
+    video.setVideoSource(videoSlide, true, TAG);
 
     video.hideControls();
     video.loopForever();

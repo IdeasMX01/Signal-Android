@@ -9,12 +9,14 @@ import androidx.lifecycle.ViewModel
 import androidx.savedstate.SavedStateRegistryOwner
 import com.google.i18n.phonenumbers.NumberParseException
 import com.google.i18n.phonenumbers.PhoneNumberUtil
+import io.reactivex.rxjava3.core.Completable
 import io.reactivex.rxjava3.core.Single
 import org.signal.core.util.logging.Log
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.pin.KbsRepository
 import org.thoughtcrime.securesms.pin.TokenData
+import org.thoughtcrime.securesms.registration.SmsRetrieverReceiver
 import org.thoughtcrime.securesms.registration.VerifyAccountRepository
 import org.thoughtcrime.securesms.registration.VerifyAccountResponseProcessor
 import org.thoughtcrime.securesms.registration.VerifyAccountResponseWithoutKbs
@@ -23,7 +25,7 @@ import org.thoughtcrime.securesms.registration.VerifyProcessor
 import org.thoughtcrime.securesms.registration.viewmodel.BaseRegistrationViewModel
 import org.thoughtcrime.securesms.registration.viewmodel.NumberViewState
 import org.thoughtcrime.securesms.util.DefaultValueLiveData
-import org.thoughtcrime.securesms.util.TextSecurePreferences
+import org.whispersystems.signalservice.api.push.PNI
 import org.whispersystems.signalservice.internal.ServiceResponse
 import org.whispersystems.signalservice.internal.push.VerifyAccountResponse
 import java.util.Objects
@@ -37,6 +39,7 @@ class ChangeNumberViewModel(
   password: String,
   verifyAccountRepository: VerifyAccountRepository,
   kbsRepository: KbsRepository,
+  private val smsRetrieverReceiver: SmsRetrieverReceiver = SmsRetrieverReceiver(ApplicationDependencies.getApplication())
 ) : BaseRegistrationViewModel(savedState, verifyAccountRepository, kbsRepository, password) {
 
   var oldNumberState: NumberViewState = NumberViewState.Builder().build()
@@ -56,6 +59,13 @@ class ChangeNumberViewModel(
     } catch (e: NumberParseException) {
       Log.i(TAG, "Unable to parse number for default country code")
     }
+
+    smsRetrieverReceiver.registerReceiver()
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    smsRetrieverReceiver.unregisterReceiver()
   }
 
   fun getLiveOldNumber(): LiveData<NumberViewState> {
@@ -107,6 +117,10 @@ class ChangeNumberViewModel(
     }
   }
 
+  fun ensureDecryptionsDrained(): Completable {
+    return changeNumberRepository.ensureDecryptionsDrained()
+  }
+
   override fun verifyCodeWithoutRegistrationLock(code: String): Single<VerifyAccountResponseProcessor> {
     return super.verifyCodeWithoutRegistrationLock(code)
       .doOnSubscribe { SignalStore.misc().lockChangeNumber() }
@@ -122,6 +136,7 @@ class ChangeNumberViewModel(
   private fun <T : VerifyProcessor> attemptToUnlockChangeNumber(processor: T): Single<T> {
     return if (processor.hasResult() || processor.isServerSentError()) {
       SignalStore.misc().unlockChangeNumber()
+      SignalStore.misc().clearPendingChangeNumberMetadata()
       Single.just(processor)
     } else {
       changeNumberRepository.whoAmI()
@@ -129,6 +144,7 @@ class ChangeNumberViewModel(
           if (Objects.equals(whoAmI.number, localNumber)) {
             Log.i(TAG, "Local and remote numbers match, we can unlock.")
             SignalStore.misc().unlockChangeNumber()
+            SignalStore.misc().clearPendingChangeNumberMetadata()
           }
           processor
         }
@@ -146,7 +162,7 @@ class ChangeNumberViewModel(
 
   @WorkerThread
   override fun onVerifySuccess(processor: VerifyAccountResponseProcessor): Single<VerifyAccountResponseProcessor> {
-    return changeNumberRepository.changeLocalNumber(number.e164Number)
+    return changeNumberRepository.changeLocalNumber(number.e164Number, PNI.parseOrThrow(processor.result.pni))
       .map { processor }
       .onErrorReturn { t ->
         Log.w(TAG, "Error attempting to change local number", t)
@@ -155,7 +171,7 @@ class ChangeNumberViewModel(
   }
 
   override fun onVerifySuccessWithRegistrationLock(processor: VerifyCodeWithRegistrationLockResponseProcessor, pin: String): Single<VerifyCodeWithRegistrationLockResponseProcessor> {
-    return changeNumberRepository.changeLocalNumber(number.e164Number)
+    return changeNumberRepository.changeLocalNumber(number.e164Number, PNI.parseOrThrow(processor.result.verifyAccountResponse.pni))
       .map { processor }
       .onErrorReturn { t ->
         Log.w(TAG, "Error attempting to change local number", t)
@@ -165,14 +181,14 @@ class ChangeNumberViewModel(
 
   class Factory(owner: SavedStateRegistryOwner) : AbstractSavedStateViewModelFactory(owner, null) {
 
-    override fun <T : ViewModel?> create(key: String, modelClass: Class<T>, handle: SavedStateHandle): T {
+    override fun <T : ViewModel> create(key: String, modelClass: Class<T>, handle: SavedStateHandle): T {
       val context: Application = ApplicationDependencies.getApplication()
-      val localNumber: String = TextSecurePreferences.getLocalNumber(context)
-      val password: String = TextSecurePreferences.getPushServerPassword(context)
+      val localNumber: String = SignalStore.account().e164!!
+      val password: String = SignalStore.account().servicePassword!!
 
       val viewModel = ChangeNumberViewModel(
         localNumber = localNumber,
-        changeNumberRepository = ChangeNumberRepository(context),
+        changeNumberRepository = ChangeNumberRepository(),
         savedState = handle,
         password = password,
         verifyAccountRepository = VerifyAccountRepository(context),

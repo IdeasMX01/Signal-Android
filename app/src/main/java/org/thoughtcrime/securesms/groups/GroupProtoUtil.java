@@ -8,17 +8,17 @@ import androidx.annotation.WorkerThread;
 
 import com.google.protobuf.ByteString;
 
+import org.signal.libsignal.zkgroup.groups.GroupMasterKey;
 import org.signal.storageservice.protos.groups.GroupChange;
 import org.signal.storageservice.protos.groups.local.DecryptedGroup;
 import org.signal.storageservice.protos.groups.local.DecryptedGroupChange;
 import org.signal.storageservice.protos.groups.local.DecryptedMember;
 import org.signal.storageservice.protos.groups.local.DecryptedPendingMember;
-import org.signal.zkgroup.groups.GroupMasterKey;
-import org.signal.zkgroup.util.UUIDUtil;
 import org.thoughtcrime.securesms.database.model.databaseprotos.DecryptedGroupV2Context;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.recipients.RecipientId;
-import org.whispersystems.signalservice.api.groupsv2.GroupsV2Operations;
+import org.whispersystems.signalservice.api.groupsv2.PartialDecryptedGroup;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.util.UuidUtil;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 
@@ -30,19 +30,19 @@ public final class GroupProtoUtil {
   private GroupProtoUtil() {
   }
 
-  public static int findRevisionWeWereAdded(@NonNull DecryptedGroup group, @NonNull UUID uuid)
+  public static int findRevisionWeWereAdded(@NonNull PartialDecryptedGroup partialDecryptedGroup, @NonNull UUID uuid)
       throws GroupNotAMemberException
   {
     ByteString bytes = UuidUtil.toByteString(uuid);
-    for (DecryptedMember decryptedMember : group.getMembersList()) {
+    for (DecryptedMember decryptedMember : partialDecryptedGroup.getMembersList()) {
       if (decryptedMember.getUuid().equals(bytes)) {
         return decryptedMember.getJoinedAtRevision();
       }
     }
-    for (DecryptedPendingMember decryptedMember : group.getPendingMembersList()) {
+    for (DecryptedPendingMember decryptedMember : partialDecryptedGroup.getPendingMembersList()) {
       if (decryptedMember.getUuid().equals(bytes)) {
         // Assume latest, we don't have any information about when pending members were invited
-        return group.getRevision();
+        return partialDecryptedGroup.getRevision();
       }
     }
     throw new GroupNotAMemberException();
@@ -85,26 +85,25 @@ public final class GroupProtoUtil {
 
   @WorkerThread
   public static Recipient uuidByteStringToRecipient(@NonNull Context context, @NonNull ByteString uuidByteString) {
-    UUID uuid = UUIDUtil.deserialize(uuidByteString.toByteArray());
+    ServiceId serviceId = ServiceId.fromByteString(uuidByteString);
 
-    if (uuid.equals(GroupsV2Operations.UNKNOWN_UUID)) {
+    if (serviceId.isUnknown()) {
       return Recipient.UNKNOWN;
     }
 
-    return Recipient.externalPush(context, uuid, null, false);
+    return Recipient.externalPush(serviceId);
   }
 
   @WorkerThread
   public static @NonNull RecipientId uuidByteStringToRecipientId(@NonNull ByteString uuidByteString) {
-    UUID uuid = UUIDUtil.deserialize(uuidByteString.toByteArray());
+    ServiceId serviceId = ServiceId.fromByteString(uuidByteString);
 
-    if (uuid.equals(GroupsV2Operations.UNKNOWN_UUID)) {
+    if (serviceId.isUnknown()) {
       return RecipientId.UNKNOWN;
     }
 
-    return RecipientId.from(uuid, null);
+    return RecipientId.from(serviceId);
   }
-
 
   public static boolean isMember(@NonNull UUID uuid, @NonNull List<DecryptedMember> membersList) {
     ByteString uuidBytes = UuidUtil.toByteString(uuid);

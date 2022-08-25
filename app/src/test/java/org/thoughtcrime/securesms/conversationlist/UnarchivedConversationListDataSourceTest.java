@@ -3,45 +3,43 @@ package org.thoughtcrime.securesms.conversationlist;
 import android.app.Application;
 import android.database.Cursor;
 
-import androidx.test.core.app.ApplicationProvider;
-
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.powermock.core.classloader.annotations.PowerMockIgnore;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.rule.PowerMockRule;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import org.thoughtcrime.securesms.conversationlist.model.ConversationReader;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.DatabaseObserver;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
-import org.thoughtcrime.securesms.util.paging.Invalidator;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.powermock.api.mockito.PowerMockito.mock;
-import static org.powermock.api.mockito.PowerMockito.mockStatic;
-import static org.powermock.api.mockito.PowerMockito.when;
+import static org.mockito.Mockito.when;
 
-@Ignore("PowerMock failing")
 @RunWith(RobolectricTestRunner.class)
 @Config(manifest = Config.NONE, application = Application.class)
-@PowerMockIgnore({ "org.mockito.*", "org.robolectric.*", "android.*", "androidx.*", "org.powermock.*" })
-@PrepareForTest({ ApplicationDependencies.class, DatabaseFactory.class, DatabaseObserver.class })
 public class UnarchivedConversationListDataSourceTest {
 
   @Rule
-  public PowerMockRule rule = new PowerMockRule();
+  public MockitoRule rule = MockitoJUnit.rule();
+
+  @Mock
+  private MockedStatic<ApplicationDependencies> applicationDependenciesMockedStatic;
+
+  @Mock
+  private MockedStatic<SignalDatabase> signalDatabaseMockedStatic;
 
   private ConversationListDataSource.UnarchivedConversationListDataSource testSubject;
 
@@ -49,12 +47,9 @@ public class UnarchivedConversationListDataSourceTest {
 
   @Before
   public void setUp() {
-    mockStatic(ApplicationDependencies.class);
-    mockStatic(DatabaseFactory.class);
-
     threadDatabase = mock(ThreadDatabase.class);
 
-    when(DatabaseFactory.getThreadDatabase(any())).thenReturn(threadDatabase);
+    when(SignalDatabase.threads()).thenReturn(threadDatabase);
     when(ApplicationDependencies.getDatabaseObserver()).thenReturn(mock(DatabaseObserver.class));
 
     testSubject = new ConversationListDataSource.UnarchivedConversationListDataSource(mock(Application.class));

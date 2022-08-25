@@ -15,6 +15,7 @@ import com.annimon.stream.function.BiFunction;
 import net.zetetic.database.sqlcipher.SQLiteDatabase;
 
 import org.signal.core.util.logging.Log;
+import org.signal.libsignal.protocol.InvalidMessageException;
 import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.crypto.AsymmetricMasterCipher;
 import org.thoughtcrime.securesms.crypto.AttachmentSecretProvider;
@@ -25,7 +26,6 @@ import org.thoughtcrime.securesms.migrations.LegacyMigrationJob;
 import org.thoughtcrime.securesms.service.GenericForegroundService;
 import org.thoughtcrime.securesms.util.Base64;
 import org.thoughtcrime.securesms.util.TextSecurePreferences;
-import org.whispersystems.libsignal.InvalidMessageException;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -38,9 +38,9 @@ public class SQLCipherMigrationHelper {
   private static final long ENCRYPTION_SYMMETRIC_BIT  = 0x80000000;
   private static final long ENCRYPTION_ASYMMETRIC_BIT = 0x40000000;
 
-  static void migratePlaintext(@NonNull Context context,
-                               @NonNull android.database.sqlite.SQLiteDatabase legacyDb,
-                               @NonNull SQLiteDatabase modernDb)
+  public static void migratePlaintext(@NonNull Context context,
+                                      @NonNull android.database.sqlite.SQLiteDatabase legacyDb,
+                                      @NonNull SQLiteDatabase modernDb)
   {
     modernDb.beginTransaction();
     int foregroundId = GenericForegroundService.startForegroundTask(context, context.getString(R.string.SQLCipherMigrationHelper_migrating_signal_database)).getId();

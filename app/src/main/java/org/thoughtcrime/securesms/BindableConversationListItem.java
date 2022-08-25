@@ -1,7 +1,9 @@
 package org.thoughtcrime.securesms;
 
 import androidx.annotation.NonNull;
+import androidx.lifecycle.LifecycleOwner;
 
+import org.thoughtcrime.securesms.conversationlist.model.ConversationSet;
 import org.thoughtcrime.securesms.database.model.ThreadRecord;
 import org.thoughtcrime.securesms.mms.GlideRequests;
 
@@ -10,11 +12,12 @@ import java.util.Set;
 
 public interface BindableConversationListItem extends Unbindable {
 
-  void bind(@NonNull ThreadRecord thread,
+  void bind(@NonNull LifecycleOwner lifecycleOwner,
+            @NonNull ThreadRecord thread,
             @NonNull GlideRequests glideRequests, @NonNull Locale locale,
             @NonNull Set<Long> typingThreads,
-            @NonNull Set<Long> selectedThreads, boolean batchMode);
+            @NonNull ConversationSet selectedConversations);
 
-  void setBatchMode(boolean batchMode);
+  void setSelectedConversations(@NonNull ConversationSet conversations);
   void updateTypingIndicator(@NonNull Set<Long> typingThreads);
 }

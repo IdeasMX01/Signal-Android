@@ -30,7 +30,6 @@ import org.thoughtcrime.securesms.database.documents.IdentityKeyMismatch;
 import org.thoughtcrime.securesms.recipients.Recipient;
 
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
@@ -108,5 +107,12 @@ public class SmsMessageRecord extends MessageRecord {
   @Override
   public boolean isMmsNotification() {
     return false;
+  }
+
+  public @NonNull SmsMessageRecord withReactions(@NonNull List<ReactionRecord> reactions) {
+    return new SmsMessageRecord(getId(), getBody(), getRecipient(), getIndividualRecipient(), getRecipientDeviceId(), getDateSent(), getDateReceived(),
+                                getServerTimestamp(), getDeliveryReceiptCount(), getType(), getThreadId(), getDeliveryStatus(), getIdentityKeyMismatches(),
+                                getSubscriptionId(), getExpiresIn(), getExpireStarted(), getReadReceiptCount(), isUnidentified(), reactions, isRemoteDelete(),
+                                getNotifiedTimestamp(), getReceiptTimestamp());
   }
 }

@@ -32,6 +32,7 @@ import com.google.android.material.shape.MaterialShapeDrawable;
 import com.google.android.material.shape.ShapeAppearanceModel;
 
 import org.thoughtcrime.securesms.R;
+import org.thoughtcrime.securesms.components.FixedRoundedCornerBottomSheetDialogFragment;
 import org.thoughtcrime.securesms.components.emoji.EmojiEventListener;
 import org.thoughtcrime.securesms.components.emoji.EmojiPageView;
 import org.thoughtcrime.securesms.components.emoji.EmojiPageViewGridAdapter;
@@ -39,18 +40,19 @@ import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.keyboard.emoji.EmojiKeyboardPageCategoriesAdapter;
 import org.thoughtcrime.securesms.keyboard.emoji.EmojiKeyboardPageCategoryMappingModel;
 import org.thoughtcrime.securesms.keyboard.emoji.KeyboardPageSearchView;
-import org.thoughtcrime.securesms.reactions.ReactionsLoader;
 import org.thoughtcrime.securesms.reactions.edit.EditReactionsActivity;
-import org.thoughtcrime.securesms.util.MappingModel;
+import org.thoughtcrime.securesms.util.FullscreenHelper;
+import org.thoughtcrime.securesms.util.LifecycleDisposable;
 import org.thoughtcrime.securesms.util.TextSecurePreferences;
 import org.thoughtcrime.securesms.util.ViewUtil;
+import org.thoughtcrime.securesms.util.adapter.mapping.MappingModel;
 
 import java.util.Optional;
 
 import static androidx.recyclerview.widget.RecyclerView.SCROLL_STATE_IDLE;
 
-public final class ReactWithAnyEmojiBottomSheetDialogFragment extends BottomSheetDialogFragment implements EmojiEventListener,
-                                                                                                           EmojiPageViewGridAdapter.VariationSelectorListener
+public final class ReactWithAnyEmojiBottomSheetDialogFragment extends FixedRoundedCornerBottomSheetDialogFragment implements EmojiEventListener,
+                                                                                                                             EmojiPageViewGridAdapter.VariationSelectorListener
 {
 
   private static final String REACTION_STORAGE_KEY = "reactions_recent_emoji";
@@ -65,12 +67,27 @@ public final class ReactWithAnyEmojiBottomSheetDialogFragment extends BottomShee
 
   private ReactWithAnyEmojiViewModel viewModel;
   private Callback                   callback;
-  private ReactionsLoader            reactionsLoader;
   private EmojiPageView              emojiPageView;
   private KeyboardPageSearchView     search;
   private View                       tabBar;
 
+  private final LifecycleDisposable disposables = new LifecycleDisposable();
+
   private final UpdateCategorySelectionOnScroll categoryUpdateOnScroll = new UpdateCategorySelectionOnScroll();
+
+  public static DialogFragment createForStory() {
+    DialogFragment fragment = new ReactWithAnyEmojiBottomSheetDialogFragment();
+    Bundle         args     = new Bundle();
+
+    args.putLong(ARG_MESSAGE_ID, -1);
+    args.putBoolean(ARG_IS_MMS, false);
+    args.putInt(ARG_START_PAGE, -1);
+    args.putString(ARG_RECENT_KEY, REACTION_STORAGE_KEY);
+    args.putBoolean(ARG_EDIT, false);
+    fragment.setArguments(args);
+
+    return fragment;
+  }
 
   public static DialogFragment createForMessageRecord(@NonNull MessageRecord messageRecord, int startingPage) {
     DialogFragment fragment = new ReactWithAnyEmojiBottomSheetDialogFragment();
@@ -125,36 +142,13 @@ public final class ReactWithAnyEmojiBottomSheetDialogFragment extends BottomShee
   }
 
   @Override
-  public void onCreate(@Nullable Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    setStyle(DialogFragment.STYLE_NORMAL, R.style.Widget_Signal_ReactWithAny);
+  protected int getThemeResId() {
+    return R.style.Widget_Signal_ReactWithAny;
   }
 
   @Override
   public @NonNull Dialog onCreateDialog(Bundle savedInstanceState) {
-    BottomSheetDialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
-    dialog.getBehavior().setPeekHeight((int) (getResources().getDisplayMetrics().heightPixels * 0.50));
-
-    ShapeAppearanceModel shapeAppearanceModel = ShapeAppearanceModel.builder()
-                                                                    .setTopLeftCorner(CornerFamily.ROUNDED, ViewUtil.dpToPx(requireContext(), 18))
-                                                                    .setTopRightCorner(CornerFamily.ROUNDED, ViewUtil.dpToPx(requireContext(), 18))
-                                                                    .build();
-
-    MaterialShapeDrawable dialogBackground = new MaterialShapeDrawable(shapeAppearanceModel);
-
-    dialogBackground.setTint(ContextCompat.getColor(requireContext(), R.color.react_with_any_background));
-
-    dialog.getBehavior().addBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
-      @Override
-      public void onStateChanged(@NonNull View bottomSheet, int newState) {
-        if (bottomSheet.getBackground() != dialogBackground) {
-          ViewCompat.setBackground(bottomSheet, dialogBackground);
-        }
-      }
-
-      @Override
-      public void onSlide(@NonNull View bottomSheet, float slideOffset) { }
-    });
+    Dialog dialog = (BottomSheetDialog) super.onCreateDialog(savedInstanceState);
 
     boolean shadows = requireArguments().getBoolean(ARG_SHADOWS, true);
     if (!shadows) {
@@ -174,61 +168,51 @@ public final class ReactWithAnyEmojiBottomSheetDialogFragment extends BottomShee
 
   @Override
   public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-    reactionsLoader = new ReactionsLoader(requireContext(),
-                                          requireArguments().getLong(ARG_MESSAGE_ID),
-                                          requireArguments().getBoolean(ARG_IS_MMS));
-
-    LoaderManager.getInstance(requireActivity()).initLoader((int) requireArguments().getLong(ARG_MESSAGE_ID), null, reactionsLoader);
+    disposables.bindTo(getViewLifecycleOwner());
 
     emojiPageView = view.findViewById(R.id.react_with_any_emoji_page_view);
     emojiPageView.initialize(this, this, true);
     emojiPageView.addOnScrollListener(categoryUpdateOnScroll);
 
     search = view.findViewById(R.id.react_with_any_emoji_search);
-    search.setCallbacks(new SearchCallbacks());
 
     initializeViewModel();
-  }
 
-  @Override
-  public void onActivityCreated(@Nullable Bundle savedInstanceState) {
-    super.onActivityCreated(savedInstanceState);
+    EmojiKeyboardPageCategoriesAdapter categoriesAdapter = new EmojiKeyboardPageCategoriesAdapter(key -> {
+      scrollTo(key);
+      viewModel.selectPage(key);
+    });
 
-    if (savedInstanceState == null) {
-      EmojiKeyboardPageCategoriesAdapter categoriesAdapter = new EmojiKeyboardPageCategoriesAdapter(key -> {
-        scrollTo(key);
-        viewModel.selectPage(key);
-      });
+    FrameLayout container = requireDialog().findViewById(R.id.container);
+    tabBar = LayoutInflater.from(requireContext())
+                           .inflate(R.layout.react_with_any_emoji_tabs,
+                                    container,
+                                    false);
+    RecyclerView categoriesRecycler = tabBar.findViewById(R.id.emoji_categories_recycler);
+    categoriesRecycler.setAdapter(categoriesAdapter);
 
-      FrameLayout container = requireDialog().findViewById(R.id.container);
-      tabBar = LayoutInflater.from(requireContext())
-                             .inflate(R.layout.react_with_any_emoji_tabs,
-                                      container,
-                                      false);
-      RecyclerView categoriesRecycler = tabBar.findViewById(R.id.emoji_categories_recycler);
-      categoriesRecycler.setAdapter(categoriesAdapter);
-
-      if (requireArguments().getBoolean(ARG_EDIT, false)) {
-        View customizeReactions = tabBar.findViewById(R.id.customize_reactions_frame);
-        customizeReactions.setVisibility(View.VISIBLE);
-        customizeReactions.setOnClickListener(v -> startActivity(new Intent(requireContext(), EditReactionsActivity.class)));
-      }
-
-      container.addView(tabBar);
-
-      emojiPageView.addOnScrollListener(new TopAndBottomShadowHelper(requireView().findViewById(R.id.react_with_any_emoji_top_shadow),
-                                                                     tabBar.findViewById(R.id.react_with_any_emoji_bottom_shadow)));
-
-      viewModel.getEmojiList().observe(getViewLifecycleOwner(), pages -> emojiPageView.setList(pages, null));
-      viewModel.getCategories().observe(getViewLifecycleOwner(), categoriesAdapter::submitList);
-      viewModel.getSelectedKey().observe(getViewLifecycleOwner(), key -> categoriesRecycler.post(() -> {
-        int index = categoriesAdapter.indexOfFirst(EmojiKeyboardPageCategoryMappingModel.class, m -> m.getKey().equals(key));
-
-        if (index != -1) {
-          categoriesRecycler.smoothScrollToPosition(index);
-        }
-      }));
+    if (requireArguments().getBoolean(ARG_EDIT, false)) {
+      View customizeReactions = tabBar.findViewById(R.id.customize_reactions_frame);
+      customizeReactions.setVisibility(View.VISIBLE);
+      customizeReactions.setOnClickListener(v -> startActivity(new Intent(requireContext(), EditReactionsActivity.class)));
     }
+
+    container.addView(tabBar);
+
+    emojiPageView.addOnScrollListener(new TopAndBottomShadowHelper(requireView().findViewById(R.id.react_with_any_emoji_top_shadow),
+                                                                   tabBar.findViewById(R.id.react_with_any_emoji_bottom_shadow)));
+
+    disposables.add(viewModel.getEmojiList().subscribe(pages -> emojiPageView.setList(pages, null)));
+    disposables.add(viewModel.getCategories().subscribe(categoriesAdapter::submitList));
+    disposables.add(viewModel.getSelectedKey().subscribe(key -> categoriesRecycler.post(() -> {
+      int index = categoriesAdapter.indexOfFirst(EmojiKeyboardPageCategoryMappingModel.class, m -> m.getKey().equals(key));
+
+      if (index != -1) {
+        categoriesRecycler.smoothScrollToPosition(index);
+      }
+    })));
+
+    search.setCallbacks(new SearchCallbacks());
   }
 
   private void scrollTo(@NonNull String key) {
@@ -259,7 +243,7 @@ public final class ReactWithAnyEmojiBottomSheetDialogFragment extends BottomShee
   private void initializeViewModel() {
     Bundle                             args       = requireArguments();
     ReactWithAnyEmojiRepository        repository = new ReactWithAnyEmojiRepository(requireContext(), args.getString(ARG_RECENT_KEY, REACTION_STORAGE_KEY));
-    ReactWithAnyEmojiViewModel.Factory factory    = new ReactWithAnyEmojiViewModel.Factory(reactionsLoader, repository, args.getLong(ARG_MESSAGE_ID), args.getBoolean(ARG_IS_MMS));
+    ReactWithAnyEmojiViewModel.Factory factory    = new ReactWithAnyEmojiViewModel.Factory(repository, args.getLong(ARG_MESSAGE_ID), args.getBoolean(ARG_IS_MMS));
 
     viewModel = ViewModelProviders.of(this, factory).get(ReactWithAnyEmojiViewModel.class);
   }

@@ -9,14 +9,13 @@ import androidx.annotation.WorkerThread;
 import org.thoughtcrime.securesms.components.reminder.FirstInviteReminder;
 import org.thoughtcrime.securesms.components.reminder.Reminder;
 import org.thoughtcrime.securesms.components.reminder.SecondInviteReminder;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
-import org.thoughtcrime.securesms.database.MmsSmsDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.recipients.LiveRecipient;
 import org.thoughtcrime.securesms.recipients.Recipient;
-import org.thoughtcrime.securesms.util.concurrent.SimpleTask;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.signal.core.util.concurrent.SimpleTask;
 
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class InviteReminderModel {
@@ -49,11 +48,11 @@ public final class InviteReminderModel {
       return new NoReminderInfo();
     }
 
-    ThreadDatabase threadDatabase = DatabaseFactory.getThreadDatabase(context);
+    ThreadDatabase threadDatabase = SignalDatabase.threads();
     Long threadId                 = threadDatabase.getThreadIdFor(recipient.getId());
 
     if (threadId != null) {
-      int conversationCount = DatabaseFactory.getMmsSmsDatabase(context).getInsecureSentCount(threadId);
+      int conversationCount = SignalDatabase.mmsSms().getInsecureSentCount(threadId);
 
       if (conversationCount >= SECOND_INVITE_REMINDER_MESSAGE_THRESHOLD && !resolved.hasSeenSecondInviteReminder()) {
         return new SecondInviteReminderInfo(context, resolved, repository, repository.getPercentOfInsecureMessages(conversationCount));
@@ -66,8 +65,8 @@ public final class InviteReminderModel {
 
   public @NonNull Optional<Reminder> getReminder() {
     ReminderInfo info = reminderInfo.get();
-    if (info == null) return Optional.absent();
-    else              return Optional.fromNullable(info.reminder);
+    if (info == null) return Optional.empty();
+    else              return Optional.ofNullable(info.reminder);
   }
 
   public void dismissReminder() {

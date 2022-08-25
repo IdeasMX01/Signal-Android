@@ -3,6 +3,7 @@ package org.thoughtcrime.securesms.components.settings.app.privacy
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.provider.Settings
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.TextAppearanceSpan
@@ -15,6 +16,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.Navigation
 import androidx.navigation.fragment.NavHostFragment
+import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import androidx.preference.PreferenceManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import mobi.upod.timedurationpicker.TimeDurationPicker
@@ -25,7 +28,6 @@ import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.components.settings.ClickPreference
 import org.thoughtcrime.securesms.components.settings.ClickPreferenceViewHolder
 import org.thoughtcrime.securesms.components.settings.DSLConfiguration
-import org.thoughtcrime.securesms.components.settings.DSLSettingsAdapter
 import org.thoughtcrime.securesms.components.settings.DSLSettingsFragment
 import org.thoughtcrime.securesms.components.settings.DSLSettingsText
 import org.thoughtcrime.securesms.components.settings.PreferenceModel
@@ -35,14 +37,17 @@ import org.thoughtcrime.securesms.crypto.MasterSecretUtil
 import org.thoughtcrime.securesms.keyvalue.PhoneNumberPrivacyValues
 import org.thoughtcrime.securesms.keyvalue.PhoneNumberPrivacyValues.PhoneNumberListingMode
 import org.thoughtcrime.securesms.service.KeyCachingService
+import org.thoughtcrime.securesms.stories.Stories
 import org.thoughtcrime.securesms.util.CommunicationActions
 import org.thoughtcrime.securesms.util.ConversationUtil
 import org.thoughtcrime.securesms.util.ExpirationUtil
 import org.thoughtcrime.securesms.util.FeatureFlags
-import org.thoughtcrime.securesms.util.MappingAdapter
 import org.thoughtcrime.securesms.util.ServiceUtil
 import org.thoughtcrime.securesms.util.SpanUtil
 import org.thoughtcrime.securesms.util.TextSecurePreferences
+import org.thoughtcrime.securesms.util.adapter.mapping.LayoutFactory
+import org.thoughtcrime.securesms.util.adapter.mapping.MappingAdapter
+import org.thoughtcrime.securesms.util.navigation.safeNavigate
 import java.lang.Integer.max
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -68,16 +73,22 @@ class PrivacySettingsFragment : DSLSettingsFragment(R.string.preferences__privac
     viewModel.refreshBlockedCount()
   }
 
-  override fun bindAdapter(adapter: DSLSettingsAdapter) {
-    adapter.registerFactory(ValueClickPreference::class.java, MappingAdapter.LayoutFactory(::ValueClickPreferenceViewHolder, R.layout.value_click_preference_item))
+  override fun bindAdapter(adapter: MappingAdapter) {
+    adapter.registerFactory(ValueClickPreference::class.java, LayoutFactory(::ValueClickPreferenceViewHolder, R.layout.value_click_preference_item))
 
     val sharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
     val repository = PrivacySettingsRepository()
     val factory = PrivacySettingsViewModel.Factory(sharedPreferences, repository)
     viewModel = ViewModelProvider(this, factory)[PrivacySettingsViewModel::class.java]
+    val args: PrivacySettingsFragmentArgs by navArgs()
+    var showPaymentLock = true
 
     viewModel.state.observe(viewLifecycleOwner) { state ->
       adapter.submitList(getConfiguration(state).toMappingModelList())
+      if (args.showPaymentLock && showPaymentLock) {
+        showPaymentLock = false
+        recyclerView?.scrollToPosition(adapter.itemCount - 1)
+      }
     }
   }
 
@@ -88,7 +99,7 @@ class PrivacySettingsFragment : DSLSettingsFragment(R.string.preferences__privac
         summary = DSLSettingsText.from(getString(R.string.PrivacySettingsFragment__d_contacts, state.blockedCount)),
         onClick = {
           Navigation.findNavController(requireView())
-            .navigate(R.id.action_privacySettingsFragment_to_blockedUsersActivity)
+            .safeNavigate(R.id.action_privacySettingsFragment_to_blockedUsersActivity)
         }
       )
 
@@ -147,7 +158,7 @@ class PrivacySettingsFragment : DSLSettingsFragment(R.string.preferences__privac
             title = DSLSettingsText.from(R.string.PrivacySettingsFragment__default_timer_for_new_changes),
             summary = DSLSettingsText.from(R.string.PrivacySettingsFragment__set_a_default_disappearing_message_timer_for_all_new_chats_started_by_you),
             onClick = {
-              NavHostFragment.findNavController(this@PrivacySettingsFragment).navigate(R.id.action_privacySettingsFragment_to_disappearingMessagesTimerSelectFragment)
+              NavHostFragment.findNavController(this@PrivacySettingsFragment).safeNavigate(R.id.action_privacySettingsFragment_to_disappearingMessagesTimerSelectFragment)
             }
           )
         )
@@ -287,27 +298,65 @@ class PrivacySettingsFragment : DSLSettingsFragment(R.string.preferences__privac
         summary = DSLSettingsText.from(incognitoSummary),
       )
 
+      if (Stories.isFeatureAvailable()) {
+        dividerPref()
+
+        clickPref(
+          title = DSLSettingsText.from(R.string.preferences__stories),
+          summary = DSLSettingsText.from(R.string.PrivacySettingsFragment__manage_your_stories),
+          onClick = {
+            findNavController().safeNavigate(PrivacySettingsFragmentDirections.actionPrivacySettingsFragmentToStoryPrivacySettings(R.string.preferences__stories))
+          }
+        )
+      }
+
+      dividerPref()
+
+      sectionHeaderPref(R.string.preferences_app_protection__payments)
+
+      switchPref(
+        title = DSLSettingsText.from(R.string.preferences__payment_lock),
+        summary = DSLSettingsText.from(R.string.PrivacySettingsFragment__payment_lock_require_lock),
+        isChecked = state.paymentLock && ServiceUtil.getKeyguardManager(requireContext()).isKeyguardSecure,
+        onClick = {
+          if (!ServiceUtil.getKeyguardManager(requireContext()).isKeyguardSecure) {
+            showGoToPhoneSettings()
+          } else {
+            viewModel.togglePaymentLock()
+          }
+        }
+      )
+
       dividerPref()
 
       clickPref(
         title = DSLSettingsText.from(R.string.preferences__advanced),
         summary = DSLSettingsText.from(R.string.PrivacySettingsFragment__signal_message_and_calls),
         onClick = {
-          Navigation.findNavController(requireView()).navigate(R.id.action_privacySettingsFragment_to_advancedPrivacySettingsFragment)
+          Navigation.findNavController(requireView()).safeNavigate(R.id.action_privacySettingsFragment_to_advancedPrivacySettingsFragment)
         }
       )
     }
   }
 
+  private fun showGoToPhoneSettings() {
+    MaterialAlertDialogBuilder(requireContext()).apply {
+      setTitle(getString(R.string.PrivacySettingsFragment__cant_enable_title))
+      setMessage(getString(R.string.PrivacySettingsFragment__cant_enable_description))
+      setPositiveButton(R.string.PaymentsHomeFragment__enable) { _, _ -> startActivity(Intent(Settings.ACTION_BIOMETRIC_ENROLL)) }
+      setNegativeButton(R.string.PaymentsHomeFragment__not_now) { _, _ -> }
+      show()
+    }
+  }
+
   private fun getScreenLockInactivityTimeoutSummary(timeoutSeconds: Long): String {
     val hours = TimeUnit.SECONDS.toHours(timeoutSeconds)
-    val minutes =
-      TimeUnit.SECONDS.toMinutes(timeoutSeconds) - TimeUnit.SECONDS.toHours(timeoutSeconds) * 60
+    val minutes = TimeUnit.SECONDS.toMinutes(timeoutSeconds) - hours * 60
 
     return if (timeoutSeconds <= 0) {
       getString(R.string.AppProtectionPreferenceFragment_none)
     } else {
-      String.format(Locale.getDefault(), "%02d:%02d:00", hours, minutes)
+      String.format(Locale.getDefault(), "%02d:%02d", hours, minutes)
     }
   }
 

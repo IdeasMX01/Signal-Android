@@ -10,7 +10,6 @@ import org.thoughtcrime.securesms.jobs.DirectoryRefreshJob;
 import org.thoughtcrime.securesms.jobs.StorageSyncJob;
 import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.recipients.Recipient;
-import org.thoughtcrime.securesms.util.TextSecurePreferences;
 
 public final class RegistrationUtil {
 
@@ -25,7 +24,7 @@ public final class RegistrationUtil {
    */
   public static void maybeMarkRegistrationComplete(@NonNull Context context) {
     if (!SignalStore.registrationValues().isRegistrationComplete() &&
-        TextSecurePreferences.isPushRegistered(context)            &&
+        SignalStore.account().isRegistered()                       &&
         !Recipient.self().getProfileName().isEmpty()               &&
         (SignalStore.kbsValues().hasPin() || SignalStore.kbsValues().hasOptedOut()))
     {

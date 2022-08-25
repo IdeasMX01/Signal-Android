@@ -1,17 +1,21 @@
 package org.thoughtcrime.securesms.database
 
 import android.net.Uri
-import org.signal.zkgroup.profiles.ProfileKeyCredential
+import org.signal.core.util.Bitmask
+import org.signal.libsignal.zkgroup.profiles.ExpiringProfileKeyCredential
 import org.thoughtcrime.securesms.badges.models.Badge
 import org.thoughtcrime.securesms.conversation.colors.AvatarColor
 import org.thoughtcrime.securesms.conversation.colors.ChatColors
+import org.thoughtcrime.securesms.database.model.ProfileAvatarFileDetails
+import org.thoughtcrime.securesms.database.model.RecipientRecord
 import org.thoughtcrime.securesms.groups.GroupId
 import org.thoughtcrime.securesms.profiles.ProfileName
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientDetails
 import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.wallpaper.ChatWallpaper
-import org.whispersystems.libsignal.util.guava.Optional
+import org.whispersystems.signalservice.api.push.ServiceId
+import java.util.Optional
 import java.util.UUID
 import kotlin.random.Random
 
@@ -23,12 +27,12 @@ object RecipientDatabaseTestUtils {
   fun createRecipient(
     resolved: Boolean = false,
     groupName: String? = null,
-    groupAvatarId: Optional<Long> = Optional.absent(),
+    groupAvatarId: Optional<Long> = Optional.empty(),
     systemContact: Boolean = false,
     isSelf: Boolean = false,
-    participants: List<Recipient> = listOf(),
+    participants: List<RecipientId> = listOf(),
     recipientId: RecipientId = RecipientId.from(Random.nextLong()),
-    uuid: UUID? = UUID.randomUUID(),
+    serviceId: ServiceId? = ServiceId.from(UUID.randomUUID()),
     username: String? = null,
     e164: String? = null,
     email: String? = null,
@@ -44,7 +48,7 @@ object RecipientDatabaseTestUtils {
     expireMessages: Int = 0,
     registered: RecipientDatabase.RegisteredState = RecipientDatabase.RegisteredState.REGISTERED,
     profileKey: ByteArray = Random.nextBytes(32),
-    profileKeyCredential: ProfileKeyCredential? = null,
+    expiringProfileKeyCredential: ExpiringProfileKeyCredential? = null,
     systemProfileName: ProfileName = ProfileName.EMPTY,
     systemDisplayName: String? = null,
     systemContactPhoto: String? = null,
@@ -52,7 +56,7 @@ object RecipientDatabaseTestUtils {
     systemContactUri: String? = null,
     signalProfileName: ProfileName = ProfileName.EMPTY,
     signalProfileAvatar: String? = null,
-    hasProfileImage: Boolean = false,
+    profileAvatarFileDetails: ProfileAvatarFileDetails = ProfileAvatarFileDetails.NO_DETAILS,
     profileSharing: Boolean = false,
     lastProfileFetch: Long = 0L,
     notificationChannel: String? = null,
@@ -67,7 +71,7 @@ object RecipientDatabaseTestUtils {
     avatarColor: AvatarColor = AvatarColor.A100,
     about: String? = null,
     aboutEmoji: String? = null,
-    syncExtras: RecipientDatabase.RecipientSettings.SyncExtras = RecipientDatabase.RecipientSettings.SyncExtras(
+    syncExtras: RecipientRecord.SyncExtras = RecipientRecord.SyncExtras(
       null,
       null,
       null,
@@ -77,7 +81,8 @@ object RecipientDatabaseTestUtils {
     ),
     extras: Recipient.Extras? = null,
     hasGroupsInCommon: Boolean = false,
-    badges: List<Badge> = emptyList()
+    badges: List<Badge> = emptyList(),
+    isReleaseChannel: Boolean = false
   ): Recipient = Recipient(
     recipientId,
     RecipientDetails(
@@ -87,13 +92,15 @@ object RecipientDatabaseTestUtils {
       systemContact,
       isSelf,
       registered,
-      RecipientDatabase.RecipientSettings(
+      RecipientRecord(
         recipientId,
-        uuid,
+        serviceId,
+        null,
         username,
         e164,
         email,
         groupId,
+        null,
         groupType,
         blocked,
         muteUntil,
@@ -105,7 +112,7 @@ object RecipientDatabaseTestUtils {
         expireMessages,
         registered,
         profileKey,
-        profileKeyCredential,
+        expiringProfileKeyCredential,
         systemProfileName,
         systemDisplayName,
         systemContactPhoto,
@@ -113,13 +120,19 @@ object RecipientDatabaseTestUtils {
         systemContactUri,
         signalProfileName,
         signalProfileAvatar,
-        hasProfileImage,
+        profileAvatarFileDetails,
         profileSharing,
         lastProfileFetch,
         notificationChannel,
         unidentifiedAccessMode,
         forceSmsSelection,
         capabilities,
+        Recipient.Capability.deserialize(Bitmask.read(capabilities, RecipientDatabase.Capabilities.GROUPS_V1_MIGRATION, RecipientDatabase.Capabilities.BIT_LENGTH).toInt()),
+        Recipient.Capability.deserialize(Bitmask.read(capabilities, RecipientDatabase.Capabilities.SENDER_KEY, RecipientDatabase.Capabilities.BIT_LENGTH).toInt()),
+        Recipient.Capability.deserialize(Bitmask.read(capabilities, RecipientDatabase.Capabilities.ANNOUNCEMENT_GROUPS, RecipientDatabase.Capabilities.BIT_LENGTH).toInt()),
+        Recipient.Capability.deserialize(Bitmask.read(capabilities, RecipientDatabase.Capabilities.CHANGE_NUMBER, RecipientDatabase.Capabilities.BIT_LENGTH).toInt()),
+        Recipient.Capability.deserialize(Bitmask.read(capabilities, RecipientDatabase.Capabilities.STORIES, RecipientDatabase.Capabilities.BIT_LENGTH).toInt()),
+        Recipient.Capability.deserialize(Bitmask.read(capabilities, RecipientDatabase.Capabilities.GIFT_BADGES, RecipientDatabase.Capabilities.BIT_LENGTH).toInt()),
         insightBannerTier,
         storageId,
         mentionSetting,
@@ -131,9 +144,11 @@ object RecipientDatabaseTestUtils {
         syncExtras,
         extras,
         hasGroupsInCommon,
-        badges
+        badges,
+        false
       ),
-      participants
+      participants,
+      isReleaseChannel
     ),
     resolved
   )

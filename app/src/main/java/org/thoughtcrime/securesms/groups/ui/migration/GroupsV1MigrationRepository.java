@@ -20,7 +20,6 @@ import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.recipients.RecipientId;
 import org.thoughtcrime.securesms.recipients.RecipientUtil;
 import org.thoughtcrime.securesms.transport.RetryLaterException;
-import org.thoughtcrime.securesms.util.Util;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -69,9 +68,9 @@ final class GroupsV1MigrationRepository {
       return new MigrationState(Collections.emptyList(), Collections.emptyList());
     }
 
-    Set<RecipientId> needsRefresh = Stream.of(group.getParticipants())
-                                          .filter(r -> r.getGroupsV2Capability() != Recipient.Capability.SUPPORTED ||
-                                                       r.getGroupsV1MigrationCapability() != Recipient.Capability.SUPPORTED)
+    List<Recipient>  members      = Recipient.resolvedList(group.getParticipantIds());
+    Set<RecipientId> needsRefresh = Stream.of(members)
+                                          .filter(r -> r.getGroupsV1MigrationCapability() != Recipient.Capability.SUPPORTED)
                                           .map(Recipient::getId)
                                           .collect(Collectors.toSet());
 
@@ -84,7 +83,7 @@ final class GroupsV1MigrationRepository {
     }
 
     try {
-      List<Recipient> registered = Stream.of(group.getParticipants())
+      List<Recipient> registered = Stream.of(members)
                                          .filter(Recipient::isRegistered)
                                          .toList();
 
@@ -95,14 +94,13 @@ final class GroupsV1MigrationRepository {
 
     group = group.fresh();
 
-    List<Recipient> ineligible = Stream.of(group.getParticipants())
-                                       .filter(r -> !r.hasUuid()                                                         ||
-                                                    r.getGroupsV2Capability() != Recipient.Capability.SUPPORTED          ||
+    List<Recipient> ineligible = Stream.of(members)
+                                       .filter(r -> !r.hasServiceId() ||
                                                     r.getGroupsV1MigrationCapability() != Recipient.Capability.SUPPORTED ||
                                                     r.getRegistered() != RecipientDatabase.RegisteredState.REGISTERED)
                                        .toList();
 
-    List<Recipient> invites = Stream.of(group.getParticipants())
+    List<Recipient> invites = Stream.of(members)
                                     .filterNot(ineligible::contains)
                                     .filterNot(Recipient::isSelf)
                                     .filter(r -> r.getProfileKey() == null)

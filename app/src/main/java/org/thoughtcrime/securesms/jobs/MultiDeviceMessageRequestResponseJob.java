@@ -5,7 +5,6 @@ import androidx.annotation.NonNull;
 
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.crypto.UnidentifiedAccessUtil;
-import org.thoughtcrime.securesms.database.RecipientDatabase;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.jobmanager.Data;
 import org.thoughtcrime.securesms.jobmanager.Job;
@@ -102,8 +101,8 @@ public class MultiDeviceMessageRequestResponseJob extends BaseJob {
     SignalServiceMessageSender messageSender = ApplicationDependencies.getSignalServiceMessageSender();
     Recipient                  recipient     = Recipient.resolved(threadRecipient);
 
-    if (!recipient.hasServiceIdentifier()) {
-      Log.i(TAG, "Queued for recipient without service identifier");
+    if (!recipient.isGroup() && !recipient.hasServiceId()) {
+      Log.i(TAG, "Queued for non-group recipient without ServiceId");
       return;
     }
 
@@ -112,7 +111,7 @@ public class MultiDeviceMessageRequestResponseJob extends BaseJob {
     if (recipient.isGroup()) {
       response = MessageRequestResponseMessage.forGroup(recipient.getGroupId().get().getDecodedId(), localToRemoteType(type));
     } else if (recipient.isMaybeRegistered()) {
-      response = MessageRequestResponseMessage.forIndividual(RecipientUtil.toSignalServiceAddress(context, recipient), localToRemoteType(type));
+      response = MessageRequestResponseMessage.forIndividual(RecipientUtil.getOrFetchServiceId(context, recipient), localToRemoteType(type));
     } else {
       response = null;
     }

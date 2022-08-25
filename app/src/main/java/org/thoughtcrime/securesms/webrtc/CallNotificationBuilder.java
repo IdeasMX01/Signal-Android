@@ -39,6 +39,7 @@ public class CallNotificationBuilder {
   public static Notification getCallInProgressNotification(Context context, int type, Recipient recipient) {
     Intent contentIntent = new Intent(context, WebRtcCallActivity.class);
     contentIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    contentIntent.putExtra(WebRtcCallActivity.EXTRA_STARTED_FROM_FULLSCREEN, true);
 
     PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, 0);
 
@@ -51,6 +52,7 @@ public class CallNotificationBuilder {
     if (type == TYPE_INCOMING_CONNECTING) {
       builder.setContentText(context.getString(R.string.CallNotificationBuilder_connecting));
       builder.setPriority(NotificationCompat.PRIORITY_MIN);
+      builder.setContentIntent(null);
     } else if (type == TYPE_INCOMING_RINGING) {
       builder.setContentText(context.getString(recipient.isGroup() ? R.string.NotificationBarManager__incoming_signal_group_call : R.string.NotificationBarManager__incoming_signal_call));
       builder.addAction(getServiceNotificationAction(context, WebRtcCallService.denyCallIntent(context), R.drawable.ic_close_grey600_32dp, R.string.NotificationBarManager__decline_call));
@@ -80,21 +82,35 @@ public class CallNotificationBuilder {
     }
   }
 
+  public static @NonNull Notification getStartingNotification(@NonNull Context context) {
+    Intent contentIntent = new Intent(context, MainActivity.class);
+    contentIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+    PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, 0);
+
+    return new NotificationCompat.Builder(context, NotificationChannels.CALL_STATUS).setSmallIcon(R.drawable.ic_call_secure_white_24dp)
+                                                                                    .setContentIntent(pendingIntent)
+                                                                                    .setOngoing(true)
+                                                                                    .setContentTitle(context.getString(R.string.NotificationBarManager__starting_signal_call_service))
+                                                                                    .setPriority(NotificationCompat.PRIORITY_MIN)
+                                                                                    .build();
+  }
+
   public static @NonNull Notification getStoppingNotification(@NonNull Context context) {
     Intent contentIntent = new Intent(context, MainActivity.class);
     contentIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
 
     PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, 0);
 
-    return new NotificationCompat.Builder(context, NotificationChannels.OTHER).setSmallIcon(R.drawable.ic_call_secure_white_24dp)
-                                                                              .setContentIntent(pendingIntent)
-                                                                              .setOngoing(true)
-                                                                              .setContentTitle(context.getString(R.string.NotificationBarManager__stopping_signal_call_service))
-                                                                              .setPriority(NotificationCompat.PRIORITY_MIN)
-                                                                              .build();
+    return new NotificationCompat.Builder(context, NotificationChannels.CALL_STATUS).setSmallIcon(R.drawable.ic_call_secure_white_24dp)
+                                                                                    .setContentIntent(pendingIntent)
+                                                                                    .setOngoing(true)
+                                                                                    .setContentTitle(context.getString(R.string.NotificationBarManager__stopping_signal_call_service))
+                                                                                    .setPriority(NotificationCompat.PRIORITY_MIN)
+                                                                                    .build();
   }
 
-  public static int getStoppingNotificationId() {
+  public static int getStartingStoppingNotificationId() {
     return WEBRTC_NOTIFICATION;
   }
 
@@ -107,7 +123,7 @@ public class CallNotificationBuilder {
     if (callActivityRestricted() && type == TYPE_INCOMING_RINGING) {
       return NotificationChannels.CALLS;
     } else {
-      return NotificationChannels.OTHER;
+      return NotificationChannels.CALL_STATUS;
     }
   }
 

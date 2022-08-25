@@ -2,6 +2,7 @@ package org.thoughtcrime.securesms.keyvalue;
 
 import androidx.annotation.NonNull;
 
+import org.signal.ringrtc.CallManager;
 import org.thoughtcrime.securesms.BuildConfig;
 import org.thoughtcrime.securesms.util.FeatureFlags;
 
@@ -18,11 +19,14 @@ public final class InternalValues extends SignalStoreValues {
   public static final String GV2_DISABLE_AUTOMIGRATE_INITIATION   = "internal.gv2.disable_automigrate_initiation";
   public static final String GV2_DISABLE_AUTOMIGRATE_NOTIFICATION = "internal.gv2.disable_automigrate_notification";
   public static final String RECIPIENT_DETAILS                    = "internal.recipient_details";
-  public static final String FORCE_CENSORSHIP                     = "internal.force_censorship";
+  public static final String ALLOW_CENSORSHIP_SETTING             = "internal.force_censorship";
   public static final String FORCE_BUILT_IN_EMOJI                 = "internal.force_built_in_emoji";
   public static final String REMOVE_SENDER_KEY_MINIMUM            = "internal.remove_sender_key_minimum";
   public static final String DELAY_RESENDS                        = "internal.delay_resends";
   public static final String CALLING_SERVER                       = "internal.calling_server";
+  public static final String CALLING_AUDIO_PROCESSING_METHOD      = "internal.calling_audio_processing_method";
+  public static final String CALLING_BANDWIDTH_MODE               = "internal.calling_bandwidth_mode";
+  public static final String CALLING_DISABLE_TELECOM              = "internal.calling_disable_telecom";
   public static final String SHAKE_TO_REPORT                      = "internal.shake_to_report";
   public static final String DISABLE_STORAGE_SERVICE              = "internal.disable_storage_service";
 
@@ -82,10 +86,10 @@ public final class InternalValues extends SignalStoreValues {
   }
 
   /**
-   * Force the app to behave as if it is in a country where Signal is censored.
+   * Allow changing the censorship circumvention setting regardless of network status.
    */
-  public synchronized boolean forcedCensorship() {
-    return FeatureFlags.internalUser() && getBoolean(FORCE_CENSORSHIP, false);
+  public synchronized boolean allowChangingCensorshipSetting() {
+    return FeatureFlags.internalUser() && getBoolean(ALLOW_CENSORSHIP_SETTING, false);
   }
 
   /**
@@ -152,5 +156,38 @@ public final class InternalValues extends SignalStoreValues {
       internalServer = null;
     }
     return internalServer != null ? internalServer : BuildConfig.SIGNAL_SFU_URL;
+  }
+
+  /**
+   * Setting to override the default handling of hardware/software AEC.
+   */
+  public synchronized CallManager.AudioProcessingMethod callingAudioProcessingMethod() {
+    if (FeatureFlags.internalUser()) {
+      return CallManager.AudioProcessingMethod.values()[getInteger(CALLING_AUDIO_PROCESSING_METHOD, CallManager.AudioProcessingMethod.Default.ordinal())];
+    } else {
+      return CallManager.AudioProcessingMethod.Default;
+    }
+  }
+
+  /**
+   * Setting to override the default calling bandwidth mode.
+   */
+  public synchronized CallManager.BandwidthMode callingBandwidthMode() {
+    if (FeatureFlags.internalUser()) {
+      return CallManager.BandwidthMode.values()[getInteger(CALLING_BANDWIDTH_MODE, CallManager.BandwidthMode.NORMAL.ordinal())];
+    } else {
+      return CallManager.BandwidthMode.NORMAL;
+    }
+  }
+
+  /**
+   * Whether or not Telecom integration is manually disabled.
+   */
+  public synchronized boolean callingDisableTelecom() {
+    if (FeatureFlags.internalUser()) {
+      return getBoolean(CALLING_DISABLE_TELECOM, false);
+    } else {
+      return false;
+    }
   }
 }

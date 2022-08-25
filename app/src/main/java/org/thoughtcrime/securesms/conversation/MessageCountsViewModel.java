@@ -10,12 +10,12 @@ import androidx.lifecycle.Transformations;
 import androidx.lifecycle.ViewModel;
 
 import org.signal.core.util.concurrent.SignalExecutors;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
+import org.signal.libsignal.protocol.util.Pair;
 import org.thoughtcrime.securesms.database.DatabaseObserver;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.model.ThreadRecord;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.util.concurrent.SerialMonoLifoExecutor;
-import org.whispersystems.libsignal.util.Pair;
 
 import java.util.concurrent.Executor;
 
@@ -37,6 +37,10 @@ public class MessageCountsViewModel extends ViewModel {
 
       if (id == -1L) {
         return counts;
+      }
+
+      if (observer != null) {
+        ApplicationDependencies.getDatabaseObserver().unregisterObserver(observer);
       }
 
       observer = new DatabaseObserver.Observer() {
@@ -80,12 +84,12 @@ public class MessageCountsViewModel extends ViewModel {
   }
 
   private int getUnreadCount(@NonNull Context context, long threadId) {
-    ThreadRecord threadRecord = DatabaseFactory.getThreadDatabase(context).getThreadRecord(threadId);
+    ThreadRecord threadRecord = SignalDatabase.threads().getThreadRecord(threadId);
     return threadRecord != null ? threadRecord.getUnreadCount() : 0;
   }
 
   private int getUnreadMentionsCount(@NonNull Context context, long threadId) {
-    return DatabaseFactory.getMmsDatabase(context).getUnreadMentionCount(threadId);
+    return SignalDatabase.mms().getUnreadMentionCount(threadId);
   }
 
   @Override

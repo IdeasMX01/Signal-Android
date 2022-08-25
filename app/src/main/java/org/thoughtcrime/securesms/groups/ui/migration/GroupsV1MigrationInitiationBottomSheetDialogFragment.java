@@ -21,7 +21,6 @@ import org.thoughtcrime.securesms.groups.ui.GroupMemberListView;
 import org.thoughtcrime.securesms.recipients.RecipientId;
 import org.thoughtcrime.securesms.util.BottomSheetUtil;
 import org.thoughtcrime.securesms.util.ThemeUtil;
-import org.thoughtcrime.securesms.util.ViewUtil;
 import org.thoughtcrime.securesms.util.views.SimpleProgressDialog;
 
 /**
@@ -76,6 +75,9 @@ public final class GroupsV1MigrationInitiationBottomSheetDialogFragment extends 
     this.ineligibleList      = view.findViewById(R.id.gv1_migrate_ineligible_list);
     this.upgradeButton       = view.findViewById(R.id.gv1_migrate_upgrade_button);
     this.spinner             = view.findViewById(R.id.gv1_migrate_spinner);
+
+    inviteList.initializeAdapter(getViewLifecycleOwner());
+    ineligibleList.initializeAdapter(getViewLifecycleOwner());
 
     inviteList.setNestedScrollingEnabled(false);
     ineligibleList.setNestedScrollingEnabled(false);

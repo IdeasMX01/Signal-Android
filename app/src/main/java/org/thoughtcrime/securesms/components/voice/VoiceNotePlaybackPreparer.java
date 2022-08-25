@@ -13,7 +13,6 @@ import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 
 import com.annimon.stream.Stream;
-import com.google.android.exoplayer2.ControlDispatcher;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.MediaMetadata;
 import com.google.android.exoplayer2.Player;
@@ -23,12 +22,12 @@ import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
 import org.signal.core.util.ThreadUtil;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.NoSuchMessageException;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.util.MessageRecordUtil;
 import org.thoughtcrime.securesms.util.Util;
-import org.thoughtcrime.securesms.util.concurrent.SimpleTask;
+import org.signal.core.util.concurrent.SimpleTask;
 
 import java.util.Collections;
 import java.util.List;
@@ -240,8 +239,8 @@ final class VoiceNotePlaybackPreparer implements MediaSessionConnector.PlaybackP
 
   private @NonNull List<MediaItem> loadMediaItemsForSinglePlayback(long messageId) {
     try {
-      MessageRecord messageRecord = DatabaseFactory.getMmsDatabase(context)
-                                                   .getMessageRecord(messageId);
+      MessageRecord messageRecord = SignalDatabase.mms()
+                                                  .getMessageRecord(messageId);
 
       if (!MessageRecordUtil.hasAudio(messageRecord)) {
         Log.w(TAG, "Message does not contain audio.");
@@ -268,7 +267,7 @@ final class VoiceNotePlaybackPreparer implements MediaSessionConnector.PlaybackP
   @WorkerThread
   private @NonNull List<MediaItem> loadMediaItemsForConsecutivePlayback(long messageId) {
     try {
-      List<MessageRecord> recordsAfter = DatabaseFactory.getMmsSmsDatabase(context)
+      List<MessageRecord> recordsAfter = SignalDatabase.mmsSms()
                                                         .getMessagesAfterVoiceNoteInclusive(messageId, LIMIT);
 
       return buildFilteredMessageRecordList(recordsAfter).stream()
@@ -291,7 +290,6 @@ final class VoiceNotePlaybackPreparer implements MediaSessionConnector.PlaybackP
   @SuppressWarnings("deprecation")
   @Override
   public boolean onCommand(@NonNull Player player,
-                           @NonNull ControlDispatcher controlDispatcher,
                            @NonNull String command,
                            @Nullable Bundle extras,
                            @Nullable ResultReceiver cb)

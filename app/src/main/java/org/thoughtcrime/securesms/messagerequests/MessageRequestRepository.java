@@ -6,15 +6,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
 import androidx.core.util.Consumer;
 
-import com.annimon.stream.Stream;
-
 import org.signal.core.util.concurrent.SignalExecutors;
 import org.signal.core.util.logging.Log;
 import org.signal.storageservice.protos.groups.local.DecryptedGroup;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
 import org.thoughtcrime.securesms.database.MessageDatabase;
 import org.thoughtcrime.securesms.database.RecipientDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.groups.GroupChangeException;
@@ -32,11 +30,11 @@ import org.thoughtcrime.securesms.recipients.RecipientUtil;
 import org.thoughtcrime.securesms.sms.MessageSender;
 import org.thoughtcrime.securesms.util.FeatureFlags;
 import org.thoughtcrime.securesms.util.TextSecurePreferences;
-import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.internal.push.exceptions.GroupPatchNotAcceptedException;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 
 final class MessageRequestRepository {
@@ -53,23 +51,23 @@ final class MessageRequestRepository {
 
   void getGroups(@NonNull RecipientId recipientId, @NonNull Consumer<List<String>> onGroupsLoaded) {
     executor.execute(() -> {
-      GroupDatabase groupDatabase = DatabaseFactory.getGroupDatabase(context);
+      GroupDatabase groupDatabase = SignalDatabase.groups();
       onGroupsLoaded.accept(groupDatabase.getPushGroupNamesContainingMember(recipientId));
     });
   }
 
   void getGroupInfo(@NonNull RecipientId recipientId, @NonNull Consumer<GroupInfo> onGroupInfoLoaded) {
     executor.execute(() -> {
-      GroupDatabase                       groupDatabase = DatabaseFactory.getGroupDatabase(context);
+      GroupDatabase                       groupDatabase = SignalDatabase.groups();
       Optional<GroupDatabase.GroupRecord> groupRecord   = groupDatabase.getGroup(recipientId);
-      onGroupInfoLoaded.accept(groupRecord.transform(record -> {
+      onGroupInfoLoaded.accept(groupRecord.map(record -> {
         if (record.isV2Group()) {
           DecryptedGroup decryptedGroup = record.requireV2GroupProperties().getDecryptedGroup();
           return new GroupInfo(decryptedGroup.getMembersCount(), decryptedGroup.getPendingMembersCount(), decryptedGroup.getDescription());
         } else {
           return new GroupInfo(record.getMembers().size(), 0, "");
         }
-      }).or(GroupInfo.ZERO));
+      }).orElse(GroupInfo.ZERO));
     });
   }
 
@@ -104,7 +102,7 @@ final class MessageRequestRepository {
       }
     } else if (recipient.isPushV1Group()) {
       if (RecipientUtil.isMessageRequestAccepted(context, threadId)) {
-        if (recipient.getParticipants().size() > FeatureFlags.groupLimits().getHardLimit()) {
+        if (recipient.getParticipantIds().size() > FeatureFlags.groupLimits().getHardLimit()) {
           return MessageRequestState.DEPRECATED_GROUP_V1_TOO_LARGE;
         } else {
           return MessageRequestState.DEPRECATED_GROUP_V1;
@@ -134,7 +132,7 @@ final class MessageRequestRepository {
           Log.i(TAG, "GV2 accepting invite");
           GroupManager.acceptInvite(context, liveRecipient.get().requireGroupId().requireV2());
 
-          RecipientDatabase recipientDatabase = DatabaseFactory.getRecipientDatabase(context);
+          RecipientDatabase recipientDatabase = SignalDatabase.recipients();
           recipientDatabase.setProfileSharing(liveRecipient.getId(), true);
 
           onMessageRequestAccepted.run();
@@ -143,18 +141,16 @@ final class MessageRequestRepository {
           error.onError(GroupChangeFailureReason.fromException(e));
         }
       } else {
-        RecipientDatabase recipientDatabase = DatabaseFactory.getRecipientDatabase(context);
+        RecipientDatabase recipientDatabase = SignalDatabase.recipients();
         recipientDatabase.setProfileSharing(liveRecipient.getId(), true);
 
-        MessageSender.sendProfileKey(context, threadId);
+        MessageSender.sendProfileKey(threadId);
 
-        List<MessageDatabase.MarkedMessageInfo> messageIds = DatabaseFactory.getThreadDatabase(context)
-                                                                            .setEntireThreadRead(threadId);
+        List<MessageDatabase.MarkedMessageInfo> messageIds = SignalDatabase.threads().setEntireThreadRead(threadId);
         ApplicationDependencies.getMessageNotifier().updateNotification(context);
         MarkReadReceiver.process(context, messageIds);
 
-        List<MessageDatabase.MarkedMessageInfo> viewedInfos = DatabaseFactory.getMmsDatabase(context)
-                                                                             .getViewedIncomingMessages(threadId);
+        List<MessageDatabase.MarkedMessageInfo> viewedInfos = SignalDatabase.mms().getViewedIncomingMessages(threadId);
 
         SendViewedReceiptJob.enqueue(threadId, liveRecipient.getId(), viewedInfos);
 
@@ -179,7 +175,7 @@ final class MessageRequestRepository {
         try {
           GroupManager.leaveGroupFromBlockOrMessageRequest(context, resolved.requireGroupId().requirePush());
         } catch (GroupChangeException | GroupPatchNotAcceptedException e) {
-          if (DatabaseFactory.getGroupDatabase(context).isCurrentMember(resolved.requireGroupId().requirePush(), Recipient.self().getId())) {
+          if (SignalDatabase.groups().isCurrentMember(resolved.requireGroupId().requirePush(), Recipient.self().getId())) {
             Log.w(TAG, "Failed to leave group, and we're still a member.", e);
             error.onError(GroupChangeFailureReason.fromException(e));
             return;
@@ -197,7 +193,7 @@ final class MessageRequestRepository {
         ApplicationDependencies.getJobManager().add(MultiDeviceMessageRequestResponseJob.forDelete(recipient.getId()));
       }
 
-      ThreadDatabase threadDatabase = DatabaseFactory.getThreadDatabase(context);
+      ThreadDatabase threadDatabase = SignalDatabase.threads();
       threadDatabase.deleteConversation(threadId);
 
       onMessageRequestDeleted.run();
@@ -259,11 +255,6 @@ final class MessageRequestRepository {
 
       RecipientUtil.unblock(context, recipient);
 
-      List<MessageDatabase.MarkedMessageInfo> messageIds = DatabaseFactory.getThreadDatabase(context)
-                                                                          .setEntireThreadRead(threadId);
-      ApplicationDependencies.getMessageNotifier().updateNotification(context);
-      MarkReadReceiver.process(context, messageIds);
-
       if (TextSecurePreferences.isMultiDevice(context)) {
         ApplicationDependencies.getJobManager().add(MultiDeviceMessageRequestResponseJob.forAccept(liveRecipient.getId()));
       }
@@ -273,17 +264,17 @@ final class MessageRequestRepository {
   }
 
   private GroupDatabase.MemberLevel getGroupMemberLevel(@NonNull RecipientId recipientId) {
-    return DatabaseFactory.getGroupDatabase(context)
+    return SignalDatabase.groups()
                           .getGroup(recipientId)
-                          .transform(g -> g.memberLevel(Recipient.self()))
-                          .or(GroupDatabase.MemberLevel.NOT_A_MEMBER);
+                          .map(g -> g.memberLevel(Recipient.self()))
+                          .orElse(GroupDatabase.MemberLevel.NOT_A_MEMBER);
   }
 
 
   @WorkerThread
   private boolean isLegacyThread(@NonNull Recipient recipient) {
     Context context  = ApplicationDependencies.getApplication();
-    Long    threadId = DatabaseFactory.getThreadDatabase(context).getThreadIdFor(recipient.getId());
+    Long    threadId = SignalDatabase.threads().getThreadIdFor(recipient.getId());
 
     return threadId != null &&
         (RecipientUtil.hasSentMessageInThread(context, threadId) || RecipientUtil.isPreMessageRequestThread(context, threadId));

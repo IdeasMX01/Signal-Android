@@ -13,21 +13,21 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
-import androidx.lifecycle.LiveData;
 
-import org.thoughtcrime.securesms.R;
 import org.signal.imageeditor.core.model.EditorModel;
+import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.mediasend.v2.gallery.MediaGalleryFragment;
 import org.thoughtcrime.securesms.mms.MediaConstraints;
 import org.thoughtcrime.securesms.profiles.AvatarHelper;
 import org.thoughtcrime.securesms.providers.BlobProvider;
 import org.thoughtcrime.securesms.scribbles.ImageEditorFragment;
-import org.thoughtcrime.securesms.util.DefaultValueLiveData;
 import org.thoughtcrime.securesms.util.MediaUtil;
-import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.io.FileDescriptor;
 import java.util.Collections;
+import java.util.Optional;
+
+import io.reactivex.rxjava3.core.Flowable;
 
 public class AvatarSelectionActivity extends AppCompatActivity implements CameraFragment.Controller, ImageEditorFragment.Controller, MediaGalleryFragment.Callbacks {
 
@@ -94,8 +94,8 @@ public class AvatarSelectionActivity extends AppCompatActivity implements Camera
                               false,
                               false,
                               Optional.of(Media.ALL_MEDIA_BUCKET_ID),
-                              Optional.absent(),
-                              Optional.absent()));
+                              Optional.empty(),
+                              Optional.empty()));
   }
 
   @Override
@@ -126,23 +126,23 @@ public class AvatarSelectionActivity extends AppCompatActivity implements Camera
   }
 
   @Override
-  public int getDisplayRotation() {
-    return getWindowManager().getDefaultDisplay().getRotation();
-  }
-
-  @Override
   public void onCameraCountButtonClicked() {
     throw new UnsupportedOperationException("Cannot select more than one photo");
   }
 
   @Override
-  public @NonNull LiveData<Optional<Media>> getMostRecentMediaItem() {
-    return new DefaultValueLiveData<>(Optional.absent());
+  public @NonNull Flowable<Optional<Media>> getMostRecentMediaItem() {
+    return Flowable.just(Optional.empty());
   }
 
   @Override
   public @NonNull MediaConstraints getMediaConstraints() {
     return MediaConstraints.getPushMediaConstraints();
+  }
+
+  @Override
+  public int getMaxVideoDuration() {
+    return -1;
   }
 
   @Override
@@ -181,6 +181,10 @@ public class AvatarSelectionActivity extends AppCompatActivity implements Camera
   @Override
   public void onMainImageFailedToLoad() {
 
+  }
+
+  @Override
+  public void restoreState() {
   }
 
   public boolean popToRoot() {

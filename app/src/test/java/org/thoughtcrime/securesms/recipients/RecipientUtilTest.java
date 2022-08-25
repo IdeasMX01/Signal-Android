@@ -4,29 +4,30 @@ import android.content.Context;
 
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.junit.MockitoJUnit;
+import org.mockito.junit.MockitoRule;
 import org.thoughtcrime.securesms.database.MmsSmsDatabase;
 import org.thoughtcrime.securesms.database.RecipientDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.util.FeatureFlags;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.powermock.api.mockito.PowerMockito.mockStatic;
-import static org.powermock.api.mockito.PowerMockito.when;
+import static org.mockito.Mockito.when;
 
-@RunWith(PowerMockRunner.class)
-@PrepareForTest({DatabaseFactory.class, FeatureFlags.class})
 public class RecipientUtilTest {
+
+  @Rule
+  public MockitoRule rule = MockitoJUnit.rule();
 
   private Context           context               = mock(Context.class);
   private Recipient         recipient             = mock(Recipient.class);
@@ -34,13 +35,17 @@ public class RecipientUtilTest {
   private MmsSmsDatabase    mockMmsSmsDatabase    = mock(MmsSmsDatabase.class);
   private RecipientDatabase mockRecipientDatabase = mock(RecipientDatabase.class);
 
+  @Mock
+  private MockedStatic<SignalDatabase> signalDatabaseMockedStatic;
+
+  @Mock
+  private MockedStatic<FeatureFlags> featureFlagsMockedStatic;
+
   @Before
   public void setUp() {
-    mockStatic(DatabaseFactory.class);
-    when(DatabaseFactory.getThreadDatabase(any())).thenReturn(mockThreadDatabase);
-    when(DatabaseFactory.getMmsSmsDatabase(any())).thenReturn(mockMmsSmsDatabase);
-    when(DatabaseFactory.getRecipientDatabase(any())).thenReturn(mockRecipientDatabase);
-    mockStatic(FeatureFlags.class);
+    signalDatabaseMockedStatic.when(SignalDatabase::threads).thenReturn(mockThreadDatabase);
+    signalDatabaseMockedStatic.when(SignalDatabase::mmsSms).thenReturn(mockMmsSmsDatabase);
+    signalDatabaseMockedStatic.when(SignalDatabase::recipients).thenReturn(mockRecipientDatabase);
 
     when(recipient.getId()).thenReturn(RecipientId.from(5));
     when(recipient.resolve()).thenReturn(recipient);

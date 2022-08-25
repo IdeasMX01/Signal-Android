@@ -7,16 +7,14 @@ import android.database.Cursor;
 
 import androidx.annotation.NonNull;
 
-import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
+import org.signal.libsignal.protocol.util.Pair;
 import org.thoughtcrime.securesms.recipients.RecipientId;
-import org.thoughtcrime.securesms.util.SqlUtil;
-import org.whispersystems.libsignal.util.Pair;
+import org.signal.core.util.SqlUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 
@@ -36,6 +34,7 @@ public class GroupReceiptDatabase extends Database {
   public static final int STATUS_DELIVERED   = 1;
   public static final int STATUS_READ        = 2;
   public static final int STATUS_VIEWED      = 3;
+  public static final int STATUS_SKIPPED     = 4;
 
   public static final String CREATE_TABLE = "CREATE TABLE " + TABLE_NAME + " (" + ID + " INTEGER PRIMARY KEY, "                          +
       MMS_ID + " INTEGER, " + RECIPIENT_ID + " INTEGER, " + STATUS + " INTEGER, " + TIMESTAMP + " INTEGER, " + UNIDENTIFIED + " INTEGER DEFAULT 0);";
@@ -44,7 +43,7 @@ public class GroupReceiptDatabase extends Database {
       "CREATE INDEX IF NOT EXISTS group_receipt_mms_id_index ON " + TABLE_NAME + " (" + MMS_ID + ");",
   };
 
-  public GroupReceiptDatabase(Context context, SQLCipherOpenHelper databaseHelper) {
+  public GroupReceiptDatabase(Context context, SignalDatabase databaseHelper) {
     super(context, databaseHelper);
   }
 
@@ -89,6 +88,26 @@ public class GroupReceiptDatabase extends Database {
         values.put(UNIDENTIFIED, result.second() ? 1 : 0);
 
         db.update(TABLE_NAME, values, query, new String[]{ String.valueOf(mmsId), result.first().serialize()});
+      }
+
+      db.setTransactionSuccessful();
+    } finally {
+      db.endTransaction();
+    }
+  }
+
+  public void setSkipped(Collection<RecipientId> recipients, long mmsId) {
+    SQLiteDatabase db  = getWritableDatabase();
+
+    db.beginTransaction();
+    try {
+      String query = MMS_ID + " = ? AND " + RECIPIENT_ID + " = ?";
+
+      for (RecipientId recipient : recipients) {
+        ContentValues values = new ContentValues(1);
+        values.put(STATUS, STATUS_SKIPPED);
+
+        db.update(TABLE_NAME, values, query, new String[]{ String.valueOf(mmsId), recipient.serialize()});
       }
 
       db.setTransactionSuccessful();

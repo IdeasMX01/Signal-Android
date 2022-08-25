@@ -107,9 +107,19 @@ class ChatColorPreviewView @JvmOverloads constructor(
     }
   }
 
+  override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
+
+    redrawChatColors()
+  }
+
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
     super.onLayout(changed, left, top, right, bottom)
 
+    redrawChatColors()
+  }
+
+  private fun redrawChatColors() {
     if (chatColors != null) {
       setChatColors(requireNotNull(chatColors))
     }
@@ -130,7 +140,7 @@ class ChatColorPreviewView @JvmOverloads constructor(
     }
 
     val backgroundColor = if (chatWallpaper != null) {
-      R.color.conversation_item_wallpaper_bubble_color
+      R.color.conversation_item_recv_bubble_color_wallpaper
     } else {
       R.color.signal_background_secondary
     }

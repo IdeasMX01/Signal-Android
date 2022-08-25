@@ -24,13 +24,14 @@ import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.audio.AudioAttributes;
 import com.google.android.exoplayer2.ext.mediasession.MediaSessionConnector;
 import com.google.android.exoplayer2.ui.PlayerNotificationManager;
 
 import org.signal.core.util.concurrent.SignalExecutors;
 import org.signal.core.util.logging.Log;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessageDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.model.MessageId;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.jobs.MultiDeviceViewedUpdateJob;
@@ -204,6 +205,19 @@ public class VoiceNotePlaybackService extends MediaBrowserServiceCompat {
     public void onPlayerError(@NonNull PlaybackException error) {
       Log.w(TAG, "ExoPlayer error occurred:", error);
     }
+
+    @Override
+    public void onAudioAttributesChanged(AudioAttributes audioAttributes) {
+      final int stream;
+      if (audioAttributes.usage == C.USAGE_VOICE_COMMUNICATION) {
+        stream = AudioManager.STREAM_VOICE_CALL;
+      } else {
+        stream = AudioManager.STREAM_MUSIC;
+      }
+
+      Log.i(TAG, "onAudioAttributesChanged: Setting audio stream to " + stream);
+      mediaSession.setPlaybackToLocal(stream);
+    }
   }
 
   private @Nullable PlaybackParameters getPlaybackParametersForWindowPosition(int currentWindowIndex) {
@@ -241,7 +255,7 @@ public class VoiceNotePlaybackService extends MediaBrowserServiceCompat {
         }
         long            messageId       = extras.getLong(VoiceNoteMediaItemFactory.EXTRA_MESSAGE_ID);
         RecipientId     recipientId     = RecipientId.from(extras.getString(VoiceNoteMediaItemFactory.EXTRA_INDIVIDUAL_RECIPIENT_ID));
-        MessageDatabase messageDatabase = DatabaseFactory.getMmsDatabase(this);
+        MessageDatabase messageDatabase = SignalDatabase.mms();
 
         MessageDatabase.MarkedMessageInfo markedMessageInfo = messageDatabase.setIncomingMessageViewed(messageId);
 

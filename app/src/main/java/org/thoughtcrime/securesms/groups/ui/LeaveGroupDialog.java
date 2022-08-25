@@ -12,14 +12,14 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.groups.GroupChangeException;
 import org.thoughtcrime.securesms.groups.GroupId;
 import org.thoughtcrime.securesms.groups.GroupManager;
 import org.thoughtcrime.securesms.groups.ui.chooseadmin.ChooseNewAdminActivity;
 import org.thoughtcrime.securesms.recipients.Recipient;
-import org.thoughtcrime.securesms.util.concurrent.SimpleTask;
+import org.signal.core.util.concurrent.SimpleTask;
 import org.thoughtcrime.securesms.util.views.SimpleProgressDialog;
 
 import java.io.IOException;
@@ -54,10 +54,10 @@ public final class LeaveGroupDialog {
     }
 
     SimpleTask.run(activity.getLifecycle(), () -> {
-      GroupDatabase.V2GroupProperties groupProperties = DatabaseFactory.getGroupDatabase(activity)
-                                                                       .getGroup(groupId)
-                                                                       .transform(GroupDatabase.GroupRecord::requireV2GroupProperties)
-                                                                       .orNull();
+      GroupDatabase.V2GroupProperties groupProperties = SignalDatabase.groups()
+                                                                      .getGroup(groupId)
+                                                                      .map(GroupDatabase.GroupRecord::requireV2GroupProperties)
+                                                                      .orElse(null);
 
       if (groupProperties != null && groupProperties.isAdmin(Recipient.self())) {
         List<Recipient> otherMemberRecipients = groupProperties.getMemberRecipients(GroupDatabase.MemberSet.FULL_MEMBERS_EXCLUDING_SELF);

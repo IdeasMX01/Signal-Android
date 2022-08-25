@@ -1,6 +1,8 @@
 package org.thoughtcrime.securesms.registration
 
+import org.whispersystems.signalservice.api.push.exceptions.ImpossiblePhoneNumberException
 import org.whispersystems.signalservice.api.push.exceptions.LocalRateLimitException
+import org.whispersystems.signalservice.api.push.exceptions.NonNormalizedPhoneNumberException
 import org.whispersystems.signalservice.internal.ServiceResponse
 import org.whispersystems.signalservice.internal.ServiceResponseProcessor
 import org.whispersystems.signalservice.internal.push.RequestVerificationCodeResponse
@@ -23,6 +25,32 @@ class RequestVerificationCodeResponseProcessor(response: ServiceResponse<Request
 
   fun localRateLimit(): Boolean {
     return error is LocalRateLimitException
+  }
+
+  fun isImpossibleNumber(): Boolean {
+    return error is ImpossiblePhoneNumberException
+  }
+
+  fun isNonNormalizedNumber(): Boolean {
+    return error is NonNormalizedPhoneNumberException
+  }
+
+  /** Should only be called if [isNonNormalizedNumber] */
+  fun getOriginalNumber(): String {
+    if (error !is NonNormalizedPhoneNumberException) {
+      throw IllegalStateException("This can only be called when isNonNormalizedNumber()")
+    }
+
+    return (error as NonNormalizedPhoneNumberException).originalNumber
+  }
+
+  /** Should only be called if [isNonNormalizedNumber] */
+  fun getNormalizedNumber(): String {
+    if (error !is NonNormalizedPhoneNumberException) {
+      throw IllegalStateException("This can only be called when isNonNormalizedNumber()")
+    }
+
+    return (error as NonNormalizedPhoneNumberException).normalizedNumber
   }
 
   companion object {

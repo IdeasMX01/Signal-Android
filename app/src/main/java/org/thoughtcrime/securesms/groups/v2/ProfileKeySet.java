@@ -6,12 +6,13 @@ import androidx.annotation.Nullable;
 import com.google.protobuf.ByteString;
 
 import org.signal.core.util.logging.Log;
+import org.signal.libsignal.zkgroup.InvalidInputException;
+import org.signal.libsignal.zkgroup.profiles.ProfileKey;
 import org.signal.storageservice.protos.groups.local.DecryptedGroup;
 import org.signal.storageservice.protos.groups.local.DecryptedGroupChange;
 import org.signal.storageservice.protos.groups.local.DecryptedMember;
 import org.signal.storageservice.protos.groups.local.DecryptedRequestingMember;
-import org.signal.zkgroup.InvalidInputException;
-import org.signal.zkgroup.profiles.ProfileKey;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.util.UuidUtil;
 
 import java.util.LinkedHashMap;
@@ -30,8 +31,8 @@ public final class ProfileKeySet {
 
   private static final String TAG = Log.tag(ProfileKeySet.class);
 
-  private final Map<UUID, ProfileKey> profileKeys              = new LinkedHashMap<>();
-  private final Map<UUID, ProfileKey> authoritativeProfileKeys = new LinkedHashMap<>();
+  private final Map<ServiceId, ProfileKey> profileKeys              = new LinkedHashMap<>();
+  private final Map<ServiceId, ProfileKey> authoritativeProfileKeys = new LinkedHashMap<>();
 
   /**
    * Add new profile keys from a group change.
@@ -96,20 +97,20 @@ public final class ProfileKeySet {
     }
 
     if (memberUuid.equals(changeSource)) {
-      authoritativeProfileKeys.put(memberUuid, profileKey);
-      profileKeys.remove(memberUuid);
+      authoritativeProfileKeys.put(ServiceId.from(memberUuid), profileKey);
+      profileKeys.remove(ServiceId.from(memberUuid));
     } else {
-      if (!authoritativeProfileKeys.containsKey(memberUuid)) {
-        profileKeys.put(memberUuid, profileKey);
+      if (!authoritativeProfileKeys.containsKey(ServiceId.from(memberUuid))) {
+        profileKeys.put(ServiceId.from(memberUuid), profileKey);
       }
     }
   }
 
-  public Map<UUID, ProfileKey> getProfileKeys() {
+  public Map<ServiceId, ProfileKey> getProfileKeys() {
     return profileKeys;
   }
 
-  public Map<UUID, ProfileKey> getAuthoritativeProfileKeys() {
+  public Map<ServiceId, ProfileKey> getAuthoritativeProfileKeys() {
     return authoritativeProfileKeys;
   }
 }

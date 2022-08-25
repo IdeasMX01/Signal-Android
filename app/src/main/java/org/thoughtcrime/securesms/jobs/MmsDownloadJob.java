@@ -17,28 +17,28 @@ import org.thoughtcrime.securesms.attachments.UriAttachment;
 import org.thoughtcrime.securesms.contactshare.Contact;
 import org.thoughtcrime.securesms.contactshare.VCardUtil;
 import org.thoughtcrime.securesms.database.AttachmentDatabase;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessageDatabase;
 import org.thoughtcrime.securesms.database.MessageDatabase.InsertResult;
 import org.thoughtcrime.securesms.database.MmsDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.groups.GroupId;
 import org.thoughtcrime.securesms.jobmanager.Data;
 import org.thoughtcrime.securesms.jobmanager.Job;
+import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.mms.ApnUnavailableException;
 import org.thoughtcrime.securesms.mms.CompatMmsConnection;
 import org.thoughtcrime.securesms.mms.IncomingMediaMessage;
 import org.thoughtcrime.securesms.mms.MmsException;
 import org.thoughtcrime.securesms.mms.MmsRadioException;
 import org.thoughtcrime.securesms.mms.PartParser;
+import org.thoughtcrime.securesms.notifications.v2.ConversationId;
 import org.thoughtcrime.securesms.providers.BlobProvider;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.recipients.RecipientId;
 import org.thoughtcrime.securesms.service.KeyCachingService;
 import org.thoughtcrime.securesms.util.MediaUtil;
-import org.thoughtcrime.securesms.util.TextSecurePreferences;
 import org.thoughtcrime.securesms.util.Util;
-import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -46,6 +46,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -98,18 +99,18 @@ public class MmsDownloadJob extends BaseJob {
   @Override
   public void onAdded() {
     if (automatic && KeyCachingService.isLocked(context)) {
-      DatabaseFactory.getMmsDatabase(context).markIncomingNotificationReceived(threadId);
+      SignalDatabase.mms().markIncomingNotificationReceived(threadId);
       ApplicationDependencies.getMessageNotifier().updateNotification(context);
     }
   }
 
   @Override
   public void onRun() {
-    if (TextSecurePreferences.getLocalUuid(context) == null && TextSecurePreferences.getLocalNumber(context) == null) {
+    if (SignalStore.account().getE164() == null) {
       throw new NotReadyException();
     }
 
-    MessageDatabase                           database     = DatabaseFactory.getMmsDatabase(context);
+    MessageDatabase                           database     = SignalDatabase.mms();
     Optional<MmsDatabase.MmsNotificationInfo> notification = database.getNotification(messageId);
 
     if (!notification.isPresent()) {
@@ -122,7 +123,7 @@ public class MmsDownloadJob extends BaseJob {
         throw new MmsException("Notification content location was null.");
       }
 
-      if (!TextSecurePreferences.isPushRegistered(context)) {
+      if (!SignalStore.account().isRegistered()) {
         throw new MmsException("Not registered");
       }
 
@@ -169,12 +170,12 @@ public class MmsDownloadJob extends BaseJob {
 
   @Override
   public void onFailure() {
-    MessageDatabase database = DatabaseFactory.getMmsDatabase(context);
+    MessageDatabase database = SignalDatabase.mms();
     database.markDownloadState(messageId, MmsDatabase.Status.DOWNLOAD_SOFT_FAILURE);
 
     if (automatic) {
       database.markIncomingNotificationReceived(threadId);
-      ApplicationDependencies.getMessageNotifier().updateNotification(context, threadId);
+      ApplicationDependencies.getMessageNotifier().updateNotification(context, ConversationId.forConversation(threadId));
     }
   }
 
@@ -188,8 +189,8 @@ public class MmsDownloadJob extends BaseJob {
                                  int subscriptionId, @Nullable RecipientId notificationFrom)
       throws MmsException
   {
-    MessageDatabase   database    = DatabaseFactory.getMmsDatabase(context);
-    Optional<GroupId> group       = Optional.absent();
+    MessageDatabase   database    = SignalDatabase.mms();
+    Optional<GroupId> group       = Optional.empty();
     Set<RecipientId>  members     = new HashSet<>();
     String            body        = null;
     List<Attachment>  attachments = new LinkedList<>();
@@ -246,7 +247,7 @@ public class MmsDownloadJob extends BaseJob {
 
     if (members.size() > 2) {
       List<RecipientId> recipients = new ArrayList<>(members);
-      group = Optional.of(DatabaseFactory.getGroupDatabase(context).getOrCreateMmsGroupForMembers(recipients));
+      group = Optional.of(SignalDatabase.groups().getOrCreateMmsGroupForMembers(recipients));
     }
 
     IncomingMediaMessage   message      = new IncomingMediaMessage(from, group, body, TimeUnit.SECONDS.toMillis(retrieved.getDate()), -1, System.currentTimeMillis(), attachments, subscriptionId, 0, false, false, false, Optional.of(sharedContacts));
@@ -254,19 +255,19 @@ public class MmsDownloadJob extends BaseJob {
 
     if (insertResult.isPresent()) {
       database.deleteMessage(messageId);
-      ApplicationDependencies.getMessageNotifier().updateNotification(context, insertResult.get().getThreadId());
+      ApplicationDependencies.getMessageNotifier().updateNotification(context, ConversationId.forConversation(insertResult.get().getThreadId()));
     }
   }
 
   private void handleDownloadError(long messageId, long threadId, int downloadStatus, boolean automatic)
   {
-    MessageDatabase db = DatabaseFactory.getMmsDatabase(context);
+    MessageDatabase db = SignalDatabase.mms();
 
     db.markDownloadState(messageId, downloadStatus);
 
     if (automatic) {
       db.markIncomingNotificationReceived(threadId);
-      ApplicationDependencies.getMessageNotifier().updateNotification(context, threadId);
+      ApplicationDependencies.getMessageNotifier().updateNotification(context, ConversationId.forConversation(threadId));
     }
   }
 

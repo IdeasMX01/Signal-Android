@@ -22,18 +22,26 @@ import android.database.MatrixCursor;
 
 import androidx.annotation.NonNull;
 
+import org.signal.core.util.CursorUtil;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
+import org.thoughtcrime.securesms.database.RecipientDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.database.model.ThreadRecord;
 import org.thoughtcrime.securesms.phonenumbers.NumberUtil;
+import org.thoughtcrime.securesms.recipients.RecipientId;
 import org.thoughtcrime.securesms.util.FeatureFlags;
 import org.thoughtcrime.securesms.util.UsernameUtil;
+import org.whispersystems.signalservice.internal.util.Util;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * CursorLoader that initializes a ContactsDatabase instance
@@ -45,22 +53,23 @@ public class ContactsCursorLoader extends AbstractContactsCursorLoader {
   private static final String TAG = Log.tag(ContactsCursorLoader.class);
 
   public static final class DisplayMode {
-    public static final int FLAG_PUSH               = 1;
-    public static final int FLAG_SMS                = 1 << 1;
-    public static final int FLAG_ACTIVE_GROUPS      = 1 << 2;
-    public static final int FLAG_INACTIVE_GROUPS    = 1 << 3;
-    public static final int FLAG_SELF               = 1 << 4;
-    public static final int FLAG_BLOCK              = 1 << 5;
-    public static final int FLAG_HIDE_GROUPS_V1     = 1 << 5;
-    public static final int FLAG_HIDE_NEW           = 1 << 6;
-    public static final int FLAG_HIDE_RECENT_HEADER = 1 << 7;
-    public static final int FLAG_ALL                = FLAG_PUSH | FLAG_SMS | FLAG_ACTIVE_GROUPS | FLAG_INACTIVE_GROUPS | FLAG_SELF;
+    public static final int FLAG_PUSH                  = 1;
+    public static final int FLAG_SMS                   = 1 << 1;
+    public static final int FLAG_ACTIVE_GROUPS         = 1 << 2;
+    public static final int FLAG_INACTIVE_GROUPS       = 1 << 3;
+    public static final int FLAG_SELF                  = 1 << 4;
+    public static final int FLAG_BLOCK                 = 1 << 5;
+    public static final int FLAG_HIDE_GROUPS_V1        = 1 << 5;
+    public static final int FLAG_HIDE_NEW              = 1 << 6;
+    public static final int FLAG_HIDE_RECENT_HEADER    = 1 << 7;
+    public static final int FLAG_GROUPS_AFTER_CONTACTS = 1 << 8;
+    public static final int FLAG_ALL                   = FLAG_PUSH | FLAG_SMS | FLAG_ACTIVE_GROUPS | FLAG_INACTIVE_GROUPS | FLAG_SELF;
   }
 
   private static final int RECENT_CONVERSATION_MAX = 25;
 
-  private final int     mode;
-  private final boolean recents;
+  private final int              mode;
+  private final boolean          recents;
 
   private final ContactRepository contactRepository;
 
@@ -74,7 +83,7 @@ public class ContactsCursorLoader extends AbstractContactsCursorLoader {
 
     this.mode              = mode;
     this.recents           = recents;
-    this.contactRepository = new ContactRepository(context);
+    this.contactRepository = new ContactRepository(context, context.getString(R.string.note_to_self));
   }
 
   protected final List<Cursor> getUnfilteredResults() {
@@ -86,6 +95,9 @@ public class ContactsCursorLoader extends AbstractContactsCursorLoader {
     } else {
       addRecentsSection(cursorList);
       addContactsSection(cursorList);
+      if (addGroupsAfterContacts(mode)) {
+        addGroupsSection(cursorList);
+      }
     }
 
     return cursorList;
@@ -181,10 +193,10 @@ public class ContactsCursorLoader extends AbstractContactsCursorLoader {
   }
 
   private Cursor getRecentConversationsCursor(boolean groupsOnly) {
-    ThreadDatabase threadDatabase = DatabaseFactory.getThreadDatabase(getContext());
+    ThreadDatabase threadDatabase = SignalDatabase.threads();
 
     MatrixCursor recentConversations = ContactsCursorRows.createMatrixCursor(RECENT_CONVERSATION_MAX);
-    try (Cursor rawConversations = threadDatabase.getRecentConversationList(RECENT_CONVERSATION_MAX, flagSet(mode, DisplayMode.FLAG_INACTIVE_GROUPS), groupsOnly, hideGroupsV1(mode), !smsEnabled(mode))) {
+    try (Cursor rawConversations = threadDatabase.getRecentConversationList(RECENT_CONVERSATION_MAX, flagSet(mode, DisplayMode.FLAG_INACTIVE_GROUPS), false, groupsOnly, hideGroupsV1(mode), !smsEnabled(mode), false)) {
       ThreadDatabase.Reader reader = threadDatabase.readerFor(rawConversations);
       ThreadRecord          threadRecord;
       while ((threadRecord = reader.getNext()) != null) {
@@ -209,13 +221,36 @@ public class ContactsCursorLoader extends AbstractContactsCursorLoader {
   }
 
   private Cursor getGroupsCursor() {
-    MatrixCursor groupContacts = ContactsCursorRows.createMatrixCursor();
-    try (GroupDatabase.Reader reader = DatabaseFactory.getGroupDatabase(getContext()).getGroupsFilteredByTitle(getFilter(), flagSet(mode, DisplayMode.FLAG_INACTIVE_GROUPS), hideGroupsV1(mode), !smsEnabled(mode))) {
+    MatrixCursor                                groupContacts = ContactsCursorRows.createMatrixCursor();
+    Map<RecipientId, GroupDatabase.GroupRecord> groups        = new LinkedHashMap<>();
+
+    try (GroupDatabase.Reader reader = SignalDatabase.groups().queryGroupsByTitle(getFilter(), flagSet(mode, DisplayMode.FLAG_INACTIVE_GROUPS), hideGroupsV1(mode), !smsEnabled(mode))) {
       GroupDatabase.GroupRecord groupRecord;
       while ((groupRecord = reader.getNext()) != null) {
-        groupContacts.addRow(ContactsCursorRows.forGroup(groupRecord));
+        groups.put(groupRecord.getRecipientId(), groupRecord);
       }
     }
+
+    if (getFilter() != null && !Util.isEmpty(getFilter())) {
+      Set<RecipientId> filteredContacts = new HashSet<>();
+      try (Cursor cursor = SignalDatabase.recipients().queryAllContacts(getFilter())) {
+        while (cursor != null && cursor.moveToNext()) {
+          filteredContacts.add(RecipientId.from(CursorUtil.requireString(cursor, RecipientDatabase.ID)));
+        }
+      }
+
+      try (GroupDatabase.Reader reader = SignalDatabase.groups().queryGroupsByMembership(filteredContacts, flagSet(mode, DisplayMode.FLAG_INACTIVE_GROUPS), hideGroupsV1(mode), !smsEnabled(mode))) {
+        GroupDatabase.GroupRecord groupRecord;
+        while ((groupRecord = reader.getNext()) != null) {
+          groups.put(groupRecord.getRecipientId(), groupRecord);
+        }
+      }
+    }
+
+    for (GroupDatabase.GroupRecord groupRecord : groups.values()) {
+      groupContacts.addRow(ContactsCursorRows.forGroup(groupRecord));
+    }
+
     return groupContacts;
   }
 
@@ -285,16 +320,20 @@ public class ContactsCursorLoader extends AbstractContactsCursorLoader {
     return flagSet(mode, DisplayMode.FLAG_HIDE_RECENT_HEADER);
   }
 
+  private static boolean addGroupsAfterContacts(int mode) {
+    return flagSet(mode, DisplayMode.FLAG_GROUPS_AFTER_CONTACTS);
+  }
+
   private static boolean flagSet(int mode, int flag) {
     return (mode & flag) > 0;
   }
 
   public static class Factory implements AbstractContactsCursorLoader.Factory {
 
-    private final Context context;
-    private final int     displayMode;
-    private final String  cursorFilter;
-    private final boolean displayRecents;
+    private final Context          context;
+    private final int              displayMode;
+    private final String           cursorFilter;
+    private final boolean          displayRecents;
 
     public Factory(Context context, int displayMode, String cursorFilter, boolean displayRecents) {
       this.context        = context;

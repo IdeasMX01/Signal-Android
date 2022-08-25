@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2016 Open Whisper Systems
  *
  * Licensed according to the LICENSE file in this repository.
@@ -44,6 +44,12 @@ public class AccountAttributes {
   @JsonProperty
   private Capabilities capabilities;
 
+  @JsonProperty
+  private String name;
+
+  @JsonProperty
+  private int pniRegistrationId;
+
   public AccountAttributes(String signalingKey,
                            int registrationId,
                            boolean fetchesMessages,
@@ -52,7 +58,9 @@ public class AccountAttributes {
                            byte[] unidentifiedAccessKey,
                            boolean unrestrictedUnidentifiedAccess,
                            Capabilities capabilities,
-                           boolean discoverableByPhoneNumber)
+                           boolean discoverableByPhoneNumber,
+                           String name,
+                           int pniRegistrationId)
   {
     this.signalingKey                   = signalingKey;
     this.registrationId                 = registrationId;
@@ -65,6 +73,8 @@ public class AccountAttributes {
     this.unrestrictedUnidentifiedAccess = unrestrictedUnidentifiedAccess;
     this.capabilities                   = capabilities;
     this.discoverableByPhoneNumber      = discoverableByPhoneNumber;
+    this.name                           = name;
+    this.pniRegistrationId              = pniRegistrationId;
   }
 
   public AccountAttributes() {}
@@ -113,6 +123,14 @@ public class AccountAttributes {
     return capabilities;
   }
 
+  public String getName() {
+    return name;
+  }
+
+  public int getPniRegistrationId() {
+    return pniRegistrationId;
+  }
+
   public static class Capabilities {
     @JsonProperty
     private boolean uuid;
@@ -135,10 +153,16 @@ public class AccountAttributes {
     @JsonProperty
     private boolean changeNumber;
 
+    @JsonProperty
+    private boolean stories;
+
+    @JsonProperty
+    private boolean giftBadges;
+
     @JsonCreator
     public Capabilities() {}
 
-    public Capabilities(boolean uuid, boolean gv2, boolean storage, boolean gv1Migration, boolean senderKey, boolean announcementGroup, boolean changeNumber) {
+    public Capabilities(boolean uuid, boolean gv2, boolean storage, boolean gv1Migration, boolean senderKey, boolean announcementGroup, boolean changeNumber, boolean stories, boolean giftBadges) {
       this.uuid              = uuid;
       this.gv2               = gv2;
       this.storage           = storage;
@@ -146,6 +170,8 @@ public class AccountAttributes {
       this.senderKey         = senderKey;
       this.announcementGroup = announcementGroup;
       this.changeNumber      = changeNumber;
+      this.stories           = stories;
+      this.giftBadges        = giftBadges;
     }
 
     public boolean isUuid() {
@@ -174,6 +200,14 @@ public class AccountAttributes {
 
     public boolean isChangeNumber() {
       return changeNumber;
+    }
+
+    public boolean isStories() {
+      return stories;
+    }
+
+    public boolean isGiftBadges() {
+      return giftBadges;
     }
   }
 }

@@ -23,10 +23,10 @@ import org.thoughtcrime.securesms.recipients.RecipientId;
 import org.thoughtcrime.securesms.util.DynamicNoActionBarTheme;
 import org.thoughtcrime.securesms.util.DynamicTheme;
 import org.thoughtcrime.securesms.util.FullscreenHelper;
-import org.thoughtcrime.securesms.util.MappingModel;
 import org.thoughtcrime.securesms.util.Projection;
 import org.thoughtcrime.securesms.util.ViewUtil;
 import org.thoughtcrime.securesms.util.WindowUtil;
+import org.thoughtcrime.securesms.util.adapter.mapping.MappingModel;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -97,7 +97,9 @@ public class ChatWallpaperPreviewActivity extends PassphraseRequiredActivity {
     final ChatColors chatColors;
     if (recipientId != null && Recipient.live(recipientId).get().hasOwnChatColors()) {
       Recipient recipient = Recipient.live(recipientId).get();
-      bubble2Text.setText(getString(R.string.ChatWallpaperPreviewActivity__set_wallpaper_for_s, recipient.getDisplayName(this)));
+      bubble2Text.setText(getString(R.string.ChatWallpaperPreviewActivity__set_wallpaper_for_s,
+                                    recipient.isSelf() ? getString(R.string.note_to_self)
+                                                       : recipient.getDisplayName(this)));
       chatColors = recipient.getChatColors();
       bubble2.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
         updateChatColors(chatColors);

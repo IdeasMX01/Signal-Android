@@ -4,14 +4,16 @@ import android.content.Context
 import androidx.annotation.WorkerThread
 import org.signal.core.util.concurrent.SignalExecutors
 import org.signal.core.util.logging.Log
-import org.thoughtcrime.securesms.database.DatabaseFactory
+import org.thoughtcrime.securesms.database.SignalDatabase
 import org.thoughtcrime.securesms.database.ThreadDatabase
 import org.thoughtcrime.securesms.groups.GroupChangeException
 import org.thoughtcrime.securesms.groups.GroupManager
+import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.mms.OutgoingExpirationUpdateMessage
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.sms.MessageSender
+import org.thoughtcrime.securesms.storage.StorageSyncHelper
 import java.io.IOException
 
 private val TAG: String = Log.tag(ExpireTimerSettingsRepository::class.java)
@@ -36,7 +38,7 @@ class ExpireTimerSettingsRepository(val context: Context) {
           consumer.invoke(Result.failure(e))
         }
       } else {
-        DatabaseFactory.getRecipientDatabase(context).setExpireMessages(recipientId, newExpirationTime)
+        SignalDatabase.recipients.setExpireMessages(recipientId, newExpirationTime)
         val outgoingMessage = OutgoingExpirationUpdateMessage(Recipient.resolved(recipientId), System.currentTimeMillis(), newExpirationTime * 1000L)
         MessageSender.send(context, outgoingMessage, getThreadId(recipientId), false, null, null)
         consumer.invoke(Result.success(newExpirationTime))
@@ -44,9 +46,18 @@ class ExpireTimerSettingsRepository(val context: Context) {
     }
   }
 
+  fun setUniversalExpireTimerSeconds(newExpirationTime: Int, onDone: () -> Unit) {
+    SignalExecutors.BOUNDED.execute {
+      SignalStore.settings().universalExpireTimer = newExpirationTime
+      SignalDatabase.recipients.markNeedsSync(Recipient.self().id)
+      StorageSyncHelper.scheduleSyncForDataChange()
+      onDone.invoke()
+    }
+  }
+
   @WorkerThread
   private fun getThreadId(recipientId: RecipientId): Long {
-    val threadDatabase: ThreadDatabase = DatabaseFactory.getThreadDatabase(context)
+    val threadDatabase: ThreadDatabase = SignalDatabase.threads
     val recipient: Recipient = Recipient.resolved(recipientId)
     return threadDatabase.getOrCreateThreadIdFor(recipient)
   }

@@ -11,9 +11,9 @@ import androidx.lifecycle.Lifecycle;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import org.thoughtcrime.securesms.database.DatabaseFactory;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.recipients.Recipient;
-import org.thoughtcrime.securesms.util.concurrent.SimpleTask;
+import org.signal.core.util.concurrent.SimpleTask;
 
 /**
  * This should be used whenever we want to prompt the user to block/unblock a recipient.
@@ -65,7 +65,7 @@ public final class BlockUnblockDialog {
     Resources           resources = context.getResources();
 
     if (recipient.isGroup()) {
-      if (DatabaseFactory.getGroupDatabase(context).isActive(recipient.requireGroupId())) {
+      if (SignalDatabase.groups().isActive(recipient.requireGroupId())) {
         builder.setTitle(resources.getString(R.string.BlockUnblockDialog_block_and_leave_s, recipient.getDisplayName(context)));
         builder.setMessage(R.string.BlockUnblockDialog_you_will_no_longer_receive_messages_or_updates);
         builder.setPositiveButton(R.string.BlockUnblockDialog_block_and_leave, ((dialog, which) -> onBlock.run()));
@@ -76,9 +76,15 @@ public final class BlockUnblockDialog {
         builder.setPositiveButton(R.string.RecipientPreferenceActivity_block, ((dialog, which) -> onBlock.run()));
         builder.setNegativeButton(android.R.string.cancel, null);
       }
+    } else if (recipient.isReleaseNotes()) {
+      builder.setTitle(resources.getString(R.string.BlockUnblockDialog_block_s, recipient.getDisplayName(context)));
+      builder.setMessage(R.string.BlockUnblockDialog_block_getting_signal_updates_and_news);
+      builder.setPositiveButton(R.string.BlockUnblockDialog_block, ((dialog, which) -> onBlock.run()));
+      builder.setNegativeButton(android.R.string.cancel, null);
     } else {
       builder.setTitle(resources.getString(R.string.BlockUnblockDialog_block_s, recipient.getDisplayName(context)));
-      builder.setMessage(R.string.BlockUnblockDialog_blocked_people_wont_be_able_to_call_you_or_send_you_messages);
+      builder.setMessage(recipient.isRegistered() ? R.string.BlockUnblockDialog_blocked_people_wont_be_able_to_call_you_or_send_you_messages
+                                                  : R.string.BlockUnblockDialog_blocked_people_wont_be_able_to_send_you_messages);
 
       if (onBlockAndReportSpam != null) {
         builder.setNeutralButton(android.R.string.cancel, null);
@@ -104,7 +110,7 @@ public final class BlockUnblockDialog {
     Resources           resources = context.getResources();
 
     if (recipient.isGroup()) {
-      if (DatabaseFactory.getGroupDatabase(context).isActive(recipient.requireGroupId())) {
+      if (SignalDatabase.groups().isActive(recipient.requireGroupId())) {
         builder.setTitle(resources.getString(R.string.BlockUnblockDialog_unblock_s, recipient.getDisplayName(context)));
         builder.setMessage(R.string.BlockUnblockDialog_group_members_will_be_able_to_add_you);
         builder.setPositiveButton(R.string.RecipientPreferenceActivity_unblock, ((dialog, which) -> onUnblock.run()));
@@ -115,9 +121,16 @@ public final class BlockUnblockDialog {
         builder.setPositiveButton(R.string.RecipientPreferenceActivity_unblock, ((dialog, which) -> onUnblock.run()));
         builder.setNegativeButton(android.R.string.cancel, null);
       }
+    } else if (recipient.isReleaseNotes()) {
+      builder.setTitle(resources.getString(R.string.BlockUnblockDialog_unblock_s, recipient.getDisplayName(context)));
+      builder.setMessage(R.string.BlockUnblockDialog_resume_getting_signal_updates_and_news);
+
+      builder.setPositiveButton(R.string.RecipientPreferenceActivity_unblock, ((dialog, which) -> onUnblock.run()));
+      builder.setNegativeButton(android.R.string.cancel, null);
     } else {
       builder.setTitle(resources.getString(R.string.BlockUnblockDialog_unblock_s, recipient.getDisplayName(context)));
-      builder.setMessage(R.string.BlockUnblockDialog_you_will_be_able_to_call_and_message_each_other);
+      builder.setMessage(recipient.isRegistered() ? R.string.BlockUnblockDialog_you_will_be_able_to_call_and_message_each_other
+                                                  : R.string.BlockUnblockDialog_you_will_be_able_to_message_each_other);
       builder.setPositiveButton(R.string.RecipientPreferenceActivity_unblock, ((dialog, which) -> onUnblock.run()));
       builder.setNegativeButton(android.R.string.cancel, null);
     }

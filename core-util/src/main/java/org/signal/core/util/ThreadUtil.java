@@ -4,8 +4,14 @@ import android.os.Handler;
 import android.os.Looper;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.VisibleForTesting;
+
+import org.signal.core.util.concurrent.TracingExecutor;
+import org.signal.core.util.concurrent.TracingExecutorService;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Thread related utility functions.
@@ -13,6 +19,9 @@ import java.util.concurrent.CountDownLatch;
 public final class ThreadUtil {
 
   private static volatile Handler handler;
+
+  @VisibleForTesting
+  public static volatile  boolean enforceAssertions = true;
 
   private ThreadUtil() {}
 
@@ -32,13 +41,13 @@ public final class ThreadUtil {
   }
 
   public static void assertMainThread() {
-    if (!isMainThread()) {
+    if (!isMainThread() && enforceAssertions) {
       throw new AssertionError("Must run on main thread.");
     }
   }
 
   public static void assertNotMainThread() {
-    if (isMainThread()) {
+    if (isMainThread() && enforceAssertions) {
       throw new AssertionError("Cannot run on main thread.");
     }
   }
@@ -92,5 +101,13 @@ public final class ThreadUtil {
     try {
       Thread.sleep(millis);
     } catch (InterruptedException ignored) { }
+  }
+
+  public static Executor trace(Executor executor) {
+    return new TracingExecutor(executor);
+  }
+
+  public static ExecutorService trace(ExecutorService executor) {
+    return new TracingExecutorService(executor);
   }
 }

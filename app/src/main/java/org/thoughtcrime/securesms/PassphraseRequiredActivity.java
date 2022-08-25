@@ -60,7 +60,7 @@ public abstract class PassphraseRequiredActivity extends BaseActivity implements
   protected final void onCreate(Bundle savedInstanceState) {
     Tracer.getInstance().start(Log.tag(getClass()) + "#onCreate()");
     AppStartup.getInstance().onCriticalRenderEventStart();
-    this.networkAccess = new SignalServiceNetworkAccess(this);
+    this.networkAccess = ApplicationDependencies.getSignalServiceNetworkAccess();
     onPreCreate();
 
     final boolean locked = KeyCachingService.isLocked(this);
@@ -84,7 +84,7 @@ public abstract class PassphraseRequiredActivity extends BaseActivity implements
   protected void onResume() {
     super.onResume();
 
-    if (networkAccess.isCensored(this)) {
+    if (networkAccess.isCensored()) {
       ApplicationDependencies.getJobManager().add(new PushNotificationReceiveJob());
     }
   }
@@ -171,6 +171,8 @@ public abstract class PassphraseRequiredActivity extends BaseActivity implements
       return STATE_WELCOME_PUSH_SCREEN;
     } else if (SignalStore.storageService().needsAccountRestore()) {
       return STATE_ENTER_SIGNAL_PIN;
+    } else if (userHasSkippedOrForgottenPin()) {
+      return STATE_CREATE_SIGNAL_PIN;
     } else if (userMustSetProfileName()) {
       return STATE_CREATE_PROFILE_NAME;
     } else if (userMustCreateSignalPin()) {
@@ -188,6 +190,10 @@ public abstract class PassphraseRequiredActivity extends BaseActivity implements
 
   private boolean userMustCreateSignalPin() {
     return !SignalStore.registrationValues().isRegistrationComplete() && !SignalStore.kbsValues().hasPin() && !SignalStore.kbsValues().lastPinCreateFailed() && !SignalStore.kbsValues().hasOptedOut();
+  }
+
+  private boolean userHasSkippedOrForgottenPin() {
+    return !SignalStore.registrationValues().isRegistrationComplete() && !SignalStore.kbsValues().hasPin() && !SignalStore.kbsValues().hasOptedOut() && SignalStore.kbsValues().isPinForgottenOrSkipped();
   }
 
   private boolean userMustSetProfileName() {
@@ -232,7 +238,8 @@ public abstract class PassphraseRequiredActivity extends BaseActivity implements
   }
 
   private Intent getCreateProfileNameIntent() {
-    return getRoutedIntent(EditProfileActivity.class, getIntent());
+    Intent intent = EditProfileActivity.getIntentForUserProfile(this);
+    return getRoutedIntent(intent, getIntent());
   }
 
   private Intent getOldDeviceTransferIntent() {
@@ -250,6 +257,11 @@ public abstract class PassphraseRequiredActivity extends BaseActivity implements
 
   private Intent getChangeNumberLockIntent() {
     return ChangeNumberLockActivity.createIntent(this);
+  }
+
+  private Intent getRoutedIntent(Intent destination, @Nullable Intent nextIntent) {
+    if (nextIntent != null)   destination.putExtra("next_intent", nextIntent);
+    return destination;
   }
 
   private Intent getRoutedIntent(Class<?> destination, @Nullable Intent nextIntent) {

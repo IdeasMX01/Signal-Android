@@ -278,7 +278,7 @@
   <!-- Removed by excludeNonTranslatables <string name="DocumentView_unknown_file">Comhad anaithnid</string> -->
   <!--DozeReminder-->
   <!--ShareActivity-->
-  <string name="ShareActivity_share_with">Comhroinn le</string>
+  <!-- Removed by excludeNonTranslatables <string name="ShareActivity_share_with">Comhroinn le</string> -->
   <!--ExperienceUpgradeActivity-->
   <!-- Removed by excludeNonTranslatables <string name="ExperienceUpgradeActivity_welcome_to_signal_dgaf">Fáilte go Signal!</string> -->
   <!-- Removed by excludeNonTranslatables <string name="ExperienceUpgradeActivity_textsecure_is_now_called_signal">Is an teachtaire príobháideach céanna anois iad TextSecure agus RedPhone le gach cúrsa: Signal.</string> -->
@@ -868,10 +868,10 @@ a shonrú</string>
   <string name="webrtc_answer_decline_button__swipe_down_to_reject">Sleamhnaigh do mhéar síos chun diúltú dó </string>
   <!--message_details_header-->
   <string name="message_details_header__issues_need_your_attention">Is gá fadhbanna áirithe a réiteach.</string>
-  <string name="message_details_header__sent">Seolta</string>
-  <string name="message_details_header__received">Faighte</string>
-  <string name="message_details_header__disappears">Imíonn as amharc</string>
-  <string name="message_details_header__via">Trí</string>
+  <!-- Removed by excludeNonTranslatables <string name="message_details_header__sent">Seolta</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="message_details_header__received">Faighte</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="message_details_header__disappears">Imíonn as amharc</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="message_details_header__via">Trí</string> -->
   <!-- Removed by excludeNonTranslatables <string name="message_details_header__to">Chuig:</string> -->
   <!-- Removed by excludeNonTranslatables <string name="message_details_header__from">Ó:</string> -->
   <!-- Removed by excludeNonTranslatables <string name="message_details_header__with">Le:</string> -->
@@ -1011,12 +1011,12 @@ a shonrú</string>
   <!--conversation_callable_secure-->
   <string name="conversation_callable_secure__menu_call">Glao Signal</string>
   <!--conversation_context-->
-  <string name="conversation_context__menu_message_details">Sonraí na teachtaireachta</string>
-  <string name="conversation_context__menu_copy_text">Macasamhlaigh an téacs</string>
-  <string name="conversation_context__menu_delete_message">Scrios an teachtaireacht</string>
-  <string name="conversation_context__menu_forward_message">Cuir an teachtaireacht ar aghaidh</string>
-  <string name="conversation_context__menu_resend_message">Athsheol an teachtaireacht</string>
-  <string name="conversation_context__menu_reply_to_message">Freagair an teachtaireacht</string>
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_message_details">Sonraí na teachtaireachta</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_copy_text">Macasamhlaigh an téacs</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_delete_message">Scrios an teachtaireacht</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_forward_message">Cuir an teachtaireacht ar aghaidh</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_resend_message">Athsheol an teachtaireacht</string> -->
+  <!-- Removed by excludeNonTranslatables <string name="conversation_context__menu_reply_to_message">Freagair an teachtaireacht</string> -->
   <!--conversation_context_image-->
   <string name="conversation_context_image__save_attachment">Cuir an ceangaltán i dtaisce</string>
   <!--conversation_expiring_off-->
@@ -1126,7 +1126,7 @@ a shonrú</string>
   <string name="BackupDialog_copied_to_clipboard">Macasamhlaithe chuig an ngearrthaisce</string>
   <!-- Removed by excludeNonTranslatables <string name="ChatsPreferenceFragment_last_backup_s">An cúltaca deireanach: %s</string> -->
   <!-- Removed by excludeNonTranslatables <string name="ChatsPreferenceFragment_in_progress">Ar siúil</string> -->
-  <string name="LocalBackupJob_creating_backup">Ag cruthú cúltaca…</string>
+  <!-- Removed by excludeNonTranslatables <string name="LocalBackupJob_creating_backup">Ag cruthú cúltaca…</string> -->
   <string name="ProgressPreference_d_messages_so_far">%d dteachtaireacht go nuige seo</string>
   <string name="RegistrationActivity_wrong_number">Uimhir mhícheart</string>
   <string name="BackupUtil_never">Choíche</string>

@@ -13,16 +13,23 @@ import org.signal.core.util.logging.Log;
 import org.signal.paging.PagedDataSource;
 import org.thoughtcrime.securesms.conversationlist.model.Conversation;
 import org.thoughtcrime.securesms.conversationlist.model.ConversationReader;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
+import org.thoughtcrime.securesms.database.SignalDatabase;
+import org.thoughtcrime.securesms.database.SmsDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
+import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.database.model.ThreadRecord;
+import org.thoughtcrime.securesms.database.model.UpdateDescription;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.recipients.Recipient;
-import org.thoughtcrime.securesms.util.Stopwatch;
+import org.thoughtcrime.securesms.recipients.RecipientId;
+import org.signal.core.util.Stopwatch;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 abstract class ConversationListDataSource implements PagedDataSource<Long, Conversation> {
 
@@ -31,7 +38,7 @@ abstract class ConversationListDataSource implements PagedDataSource<Long, Conve
   protected final ThreadDatabase threadDatabase;
 
   protected ConversationListDataSource(@NonNull Context context) {
-    this.threadDatabase = DatabaseFactory.getThreadDatabase(context);
+    this.threadDatabase = SignalDatabase.threads();
   }
 
   public static ConversationListDataSource create(@NonNull Context context, boolean isArchived) {
@@ -52,22 +59,33 @@ abstract class ConversationListDataSource implements PagedDataSource<Long, Conve
   public @NonNull List<Conversation> load(int start, int length, @NonNull CancellationSignal cancellationSignal) {
     Stopwatch stopwatch = new Stopwatch("load(" + start + ", " + length + "), " + getClass().getSimpleName());
 
-    List<Conversation> conversations  = new ArrayList<>(length);
-    List<Recipient>    recipients     = new LinkedList<>();
+    List<Conversation> conversations = new ArrayList<>(length);
+    List<Recipient>    recipients    = new LinkedList<>();
+    Set<RecipientId>   needsResolve  = new HashSet<>();
 
     try (ConversationReader reader = new ConversationReader(getCursor(start, length))) {
       ThreadRecord record;
       while ((record = reader.getNext()) != null && !cancellationSignal.isCanceled()) {
         conversations.add(new Conversation(record));
         recipients.add(record.getRecipient());
+        needsResolve.add(record.getGroupMessageSender());
+
+        if (!SmsDatabase.Types.isGroupV2(record.getType())) {
+          needsResolve.add(record.getRecipient().getId());
+        } else if (SmsDatabase.Types.isGroupUpdate(record.getType())) {
+          UpdateDescription description = MessageRecord.getGv2ChangeDescription(ApplicationDependencies.getApplication(), record.getBody(), null);
+          needsResolve.addAll(description.getMentioned().stream().map(RecipientId::from).collect(Collectors.toList()));
+        }
       }
     }
 
     stopwatch.split("cursor");
 
     ApplicationDependencies.getRecipientCache().addToCache(recipients);
-
     stopwatch.split("cache-recipients");
+
+    Recipient.resolvedList(needsResolve);
+    stopwatch.split("recipient-resolve");
 
     stopwatch.stop(TAG);
 

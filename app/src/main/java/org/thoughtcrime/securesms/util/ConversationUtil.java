@@ -17,8 +17,8 @@ import org.signal.core.util.concurrent.SignalExecutors;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.conversation.ConversationIntents;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.groups.GroupId;
 import org.thoughtcrime.securesms.jobs.ConversationShortcutUpdateJob;
 import org.thoughtcrime.securesms.notifications.NotificationChannels;
@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * ConversationUtil encapsulates support for Android 11+'s new Conversations system
@@ -141,6 +142,14 @@ public final class ConversationUtil {
   }
 
   /**
+   * Removes the long-lived shortcuts for the given set of recipients.
+   */
+  @WorkerThread
+  public static void removeLongLivedShortcuts(@NonNull Context context, @NonNull Collection<RecipientId> recipients) {
+    ShortcutManagerCompat.removeLongLivedShortcuts(context, recipients.stream().map(ConversationUtil::getShortcutId).collect(Collectors.toList()));
+  }
+
+  /**
    * Sets the shortcuts to match the provided recipient list. This call may fail due to getting
    * rate-limited.
    *
@@ -196,7 +205,7 @@ public final class ConversationUtil {
   {
     Recipient resolved   = recipient.resolve();
     Person[]  persons    = buildPersons(context, resolved);
-    Long      threadId   = DatabaseFactory.getThreadDatabase(context).getThreadIdFor(resolved.getId());
+    Long      threadId   = SignalDatabase.threads().getThreadIdFor(resolved.getId());
     String    shortName  = resolved.isSelf() ? context.getString(R.string.note_to_self) : resolved.getShortDisplayName(context);
     String    longName   = resolved.isSelf() ? context.getString(R.string.note_to_self) : resolved.getDisplayName(context);
     String    shortcutId = getShortcutId(resolved);
@@ -232,7 +241,7 @@ public final class ConversationUtil {
    */
   @WorkerThread
   private static @NonNull Person[] buildPersonsForGroup(@NonNull Context context, @NonNull GroupId groupId) {
-    List<Recipient> members = DatabaseFactory.getGroupDatabase(context).getGroupMembers(groupId, GroupDatabase.MemberSet.FULL_MEMBERS_EXCLUDING_SELF);
+    List<Recipient> members = SignalDatabase.groups().getGroupMembers(groupId, GroupDatabase.MemberSet.FULL_MEMBERS_EXCLUDING_SELF);
 
     return Stream.of(members).map(member -> buildPersonWithoutIcon(context, member.resolve())).toArray(Person[]::new);
   }

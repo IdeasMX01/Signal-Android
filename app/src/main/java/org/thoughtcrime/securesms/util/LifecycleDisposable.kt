@@ -12,6 +12,10 @@ import io.reactivex.rxjava3.disposables.Disposable
 class LifecycleDisposable : DefaultLifecycleObserver {
   val disposables: CompositeDisposable = CompositeDisposable()
 
+  fun bindTo(lifecycleOwner: LifecycleOwner): LifecycleDisposable {
+    return bindTo(lifecycleOwner.lifecycle)
+  }
+
   fun bindTo(lifecycle: Lifecycle): LifecycleDisposable {
     lifecycle.addObserver(this)
     return this
@@ -20,6 +24,10 @@ class LifecycleDisposable : DefaultLifecycleObserver {
   fun add(disposable: Disposable): LifecycleDisposable {
     disposables.add(disposable)
     return this
+  }
+
+  fun clear() {
+    disposables.clear()
   }
 
   override fun onDestroy(owner: LifecycleOwner) {

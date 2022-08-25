@@ -4,42 +4,53 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import org.signal.donations.StripeApi
 import org.thoughtcrime.securesms.BuildConfig
 import org.thoughtcrime.securesms.keyvalue.SignalStore
+import org.thoughtcrime.securesms.subscription.Subscriber
 import org.thoughtcrime.securesms.util.livedata.Store
+import org.whispersystems.signalservice.api.subscriptions.SubscriberId
 import java.util.Currency
 import java.util.Locale
 
-class SetCurrencyViewModel(val isBoost: Boolean) : ViewModel() {
+class SetCurrencyViewModel(
+  private val isOneTime: Boolean,
+  supportedCurrencyCodes: List<String>
+) : ViewModel() {
 
-  private val store = Store(SetCurrencyState())
+  private val store = Store(
+    SetCurrencyState(
+      selectedCurrencyCode = if (isOneTime) {
+        SignalStore.donationsValues().getOneTimeCurrency().currencyCode
+      } else {
+        SignalStore.donationsValues().getSubscriptionCurrency().currencyCode
+      },
+      currencies = supportedCurrencyCodes
+        .map(Currency::getInstance)
+        .sortedWith(CurrencyComparator(BuildConfig.DEFAULT_CURRENCIES.split(",")))
+    )
+  )
 
   val state: LiveData<SetCurrencyState> = store.stateLiveData
-
-  init {
-    val defaultCurrency = SignalStore.donationsValues().getSubscriptionCurrency()
-
-    store.update { state ->
-      val platformCurrencies = Currency.getAvailableCurrencies()
-      val stripeCurrencies = platformCurrencies
-        .filter { StripeApi.Validation.supportedCurrencyCodes.contains(it.currencyCode) }
-        .sortedWith(CurrencyComparator(BuildConfig.DEFAULT_CURRENCIES.split(",")))
-
-      state.copy(
-        selectedCurrencyCode = defaultCurrency.currencyCode,
-        currencies = stripeCurrencies
-      )
-    }
-  }
 
   fun setSelectedCurrency(selectedCurrencyCode: String) {
     store.update { it.copy(selectedCurrencyCode = selectedCurrencyCode) }
 
-    if (isBoost) {
-      SignalStore.donationsValues().setBoostCurrency(Currency.getInstance(selectedCurrencyCode))
+    if (isOneTime) {
+      SignalStore.donationsValues().setOneTimeCurrency(Currency.getInstance(selectedCurrencyCode))
     } else {
-      SignalStore.donationsValues().setSubscriptionCurrency(Currency.getInstance(selectedCurrencyCode))
+      val currency = Currency.getInstance(selectedCurrencyCode)
+      val subscriber = SignalStore.donationsValues().getSubscriber(currency)
+
+      if (subscriber != null) {
+        SignalStore.donationsValues().setSubscriber(subscriber)
+      } else {
+        SignalStore.donationsValues().setSubscriber(
+          Subscriber(
+            subscriberId = SubscriberId.generate(),
+            currencyCode = currency.currencyCode
+          )
+        )
+      }
     }
   }
 
@@ -72,9 +83,9 @@ class SetCurrencyViewModel(val isBoost: Boolean) : ViewModel() {
     }
   }
 
-  class Factory(private val isBoost: Boolean) : ViewModelProvider.Factory {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
-      return modelClass.cast(SetCurrencyViewModel(isBoost))!!
+  class Factory(private val isOneTime: Boolean, private val supportedCurrencyCodes: List<String>) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+      return modelClass.cast(SetCurrencyViewModel(isOneTime, supportedCurrencyCodes))!!
     }
   }
 }

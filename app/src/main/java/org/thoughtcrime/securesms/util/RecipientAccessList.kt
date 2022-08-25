@@ -2,9 +2,8 @@ package org.thoughtcrime.securesms.util
 
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.recipients.RecipientId
+import org.whispersystems.signalservice.api.push.ServiceId
 import org.whispersystems.signalservice.api.push.SignalServiceAddress
-import java.lang.IllegalArgumentException
-import java.util.UUID
 
 /**
  * A list of Recipients, but with some helpful methods for retrieving them by various properties. Uses lazy properties to ensure that it will be as performant
@@ -12,10 +11,10 @@ import java.util.UUID
  */
 class RecipientAccessList(private val recipients: List<Recipient>) : List<Recipient> by recipients {
 
-  private val byUuid: Map<UUID, Recipient> by lazy {
+  private val byServiceId: Map<ServiceId, Recipient> by lazy {
     recipients
-      .filter { it.hasUuid() }
-      .associateBy { it.requireUuid() }
+      .filter { it.hasServiceId() }
+      .associateBy { it.requireServiceId() }
   }
 
   private val byE164: Map<String, Recipient> by lazy {
@@ -25,10 +24,10 @@ class RecipientAccessList(private val recipients: List<Recipient>) : List<Recipi
   }
 
   fun requireByAddress(address: SignalServiceAddress): Recipient {
-    if (byUuid.containsKey(address.uuid)) {
-      return byUuid.get(address.uuid)!!
+    if (byServiceId.containsKey(address.serviceId)) {
+      return byServiceId[address.serviceId]!!
     } else if (address.number.isPresent && byE164.containsKey(address.number.get())) {
-      return byE164.get(address.number.get())!!
+      return byE164[address.number.get()]!!
     } else {
       throw IllegalArgumentException("Could not find a matching recipient!")
     }

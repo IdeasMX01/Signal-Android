@@ -15,7 +15,7 @@ import org.thoughtcrime.securesms.crypto.DatabaseSecret;
 import org.thoughtcrime.securesms.crypto.DatabaseSecretProvider;
 import org.thoughtcrime.securesms.database.model.MegaphoneRecord;
 import org.thoughtcrime.securesms.megaphone.Megaphones.Event;
-import org.thoughtcrime.securesms.util.CursorUtil;
+import org.signal.core.util.CursorUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,7 +26,7 @@ import java.util.Set;
 /**
  * IMPORTANT: Writes should only be made through {@link org.thoughtcrime.securesms.megaphone.MegaphoneRepository}.
  */
-public class MegaphoneDatabase extends SQLiteOpenHelper implements SignalDatabase {
+public class MegaphoneDatabase extends SQLiteOpenHelper implements SignalDatabaseOpenHelper {
 
   private static final String TAG = Log.tag(MegaphoneDatabase.class);
 
@@ -58,6 +58,7 @@ public class MegaphoneDatabase extends SQLiteOpenHelper implements SignalDatabas
         if (instance == null) {
           SqlCipherLibraryLoader.load();
           instance = new MegaphoneDatabase(context, DatabaseSecretProvider.getOrCreateDatabaseSecret(context));
+          instance.setWriteAheadLoggingEnabled(true);
         }
       }
     }
@@ -76,9 +77,9 @@ public class MegaphoneDatabase extends SQLiteOpenHelper implements SignalDatabas
 
     db.execSQL(CREATE_TABLE);
 
-    if (DatabaseFactory.getInstance(application).hasTable("megaphone")) {
+    if (SignalDatabase.hasTable("megaphone")) {
       Log.i(TAG, "Found old megaphone table. Migrating data.");
-      migrateDataFromPreviousDatabase(DatabaseFactory.getInstance(application).getRawDatabase(), db);
+      migrateDataFromPreviousDatabase(SignalDatabase.getRawDatabase(), db);
     }
   }
 
@@ -91,13 +92,12 @@ public class MegaphoneDatabase extends SQLiteOpenHelper implements SignalDatabas
   public void onOpen(SQLiteDatabase db) {
     Log.i(TAG, "onOpen()");
 
-    db.enableWriteAheadLogging();
     db.setForeignKeyConstraintsEnabled(true);
 
     SignalExecutors.BOUNDED.execute(() -> {
-      if (DatabaseFactory.getInstance(application).hasTable("megaphone")) {
+      if (SignalDatabase.hasTable("megaphone")) {
         Log.i(TAG, "Dropping original megaphone table from the main database.");
-        DatabaseFactory.getInstance(application).getRawDatabase().execSQL("DROP TABLE megaphone");
+        SignalDatabase.getRawDatabase().execSQL("DROP TABLE megaphone");
       }
     });
   }

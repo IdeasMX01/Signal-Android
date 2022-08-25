@@ -1,33 +1,46 @@
 package org.thoughtcrime.securesms.storage;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.annimon.stream.Stream;
 
-import org.signal.zkgroup.groups.GroupMasterKey;
+import org.signal.libsignal.zkgroup.groups.GroupMasterKey;
 import org.thoughtcrime.securesms.database.IdentityDatabase;
 import org.thoughtcrime.securesms.database.RecipientDatabase;
-import org.thoughtcrime.securesms.database.RecipientDatabase.RecipientSettings;
+import org.thoughtcrime.securesms.database.SignalDatabase;
+import org.thoughtcrime.securesms.database.model.DistributionListId;
+import org.thoughtcrime.securesms.database.model.DistributionListPrivacyMode;
+import org.thoughtcrime.securesms.database.model.DistributionListRecord;
+import org.thoughtcrime.securesms.database.model.RecipientRecord;
+import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.groups.GroupId;
 import org.thoughtcrime.securesms.keyvalue.PhoneNumberPrivacyValues;
+import org.thoughtcrime.securesms.recipients.Recipient;
+import org.thoughtcrime.securesms.subscription.Subscriber;
+import org.thoughtcrime.securesms.util.FeatureFlags;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.storage.SignalAccountRecord;
 import org.whispersystems.signalservice.api.storage.SignalContactRecord;
 import org.whispersystems.signalservice.api.storage.SignalGroupV1Record;
 import org.whispersystems.signalservice.api.storage.SignalGroupV2Record;
 import org.whispersystems.signalservice.api.storage.SignalStorageRecord;
+import org.whispersystems.signalservice.api.storage.SignalStoryDistributionListRecord;
+import org.whispersystems.signalservice.api.subscriptions.SubscriberId;
 import org.whispersystems.signalservice.api.util.UuidUtil;
 import org.whispersystems.signalservice.internal.storage.protos.AccountRecord;
 import org.whispersystems.signalservice.internal.storage.protos.ContactRecord.IdentityState;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 public final class StorageSyncModels {
 
   private StorageSyncModels() {}
 
-  public static @NonNull SignalStorageRecord localToRemoteRecord(@NonNull RecipientSettings settings) {
+  public static @NonNull SignalStorageRecord localToRemoteRecord(@NonNull RecipientRecord settings) {
     if (settings.getStorageId() == null) {
       throw new AssertionError("Must have a storage key!");
     }
@@ -35,7 +48,7 @@ public final class StorageSyncModels {
     return localToRemoteRecord(settings, settings.getStorageId());
   }
 
-  public static @NonNull SignalStorageRecord localToRemoteRecord(@NonNull RecipientSettings settings, @NonNull GroupMasterKey groupMasterKey) {
+  public static @NonNull SignalStorageRecord localToRemoteRecord(@NonNull RecipientRecord settings, @NonNull GroupMasterKey groupMasterKey) {
     if (settings.getStorageId() == null) {
       throw new AssertionError("Must have a storage key!");
     }
@@ -43,12 +56,13 @@ public final class StorageSyncModels {
     return SignalStorageRecord.forGroupV2(localToRemoteGroupV2(settings, settings.getStorageId(), groupMasterKey));
   }
 
-  public static @NonNull SignalStorageRecord localToRemoteRecord(@NonNull RecipientSettings settings, @NonNull byte[] rawStorageId) {
+  public static @NonNull SignalStorageRecord localToRemoteRecord(@NonNull RecipientRecord settings, @NonNull byte[] rawStorageId) {
     switch (settings.getGroupType()) {
-      case NONE:      return SignalStorageRecord.forContact(localToRemoteContact(settings, rawStorageId));
-      case SIGNAL_V1: return SignalStorageRecord.forGroupV1(localToRemoteGroupV1(settings, rawStorageId));
-      case SIGNAL_V2: return SignalStorageRecord.forGroupV2(localToRemoteGroupV2(settings, rawStorageId, settings.getSyncExtras().getGroupMasterKey()));
-      default:        throw new AssertionError("Unsupported type!");
+      case NONE:              return SignalStorageRecord.forContact(localToRemoteContact(settings, rawStorageId));
+      case SIGNAL_V1:         return SignalStorageRecord.forGroupV1(localToRemoteGroupV1(settings, rawStorageId));
+      case SIGNAL_V2:         return SignalStorageRecord.forGroupV2(localToRemoteGroupV2(settings, rawStorageId, settings.getSyncExtras().getGroupMasterKey()));
+      case DISTRIBUTION_LIST: return SignalStorageRecord.forStoryDistributionList(localToRemoteStoryDistributionList(settings, rawStorageId));
+      default:                throw new AssertionError("Unsupported type!");
     }
   }
 
@@ -70,7 +84,7 @@ public final class StorageSyncModels {
     }
   }
 
-  public static List<SignalAccountRecord.PinnedConversation> localToRemotePinnedConversations(@NonNull List<RecipientSettings> settings) {
+  public static List<SignalAccountRecord.PinnedConversation> localToRemotePinnedConversations(@NonNull List<RecipientRecord> settings) {
     return Stream.of(settings)
                  .filter(s -> s.getGroupType() == RecipientDatabase.GroupType.SIGNAL_V1 ||
                               s.getGroupType() == RecipientDatabase.GroupType.SIGNAL_V2 ||
@@ -79,24 +93,26 @@ public final class StorageSyncModels {
                  .toList();
   }
 
-  private static @NonNull SignalAccountRecord.PinnedConversation localToRemotePinnedConversation(@NonNull RecipientSettings settings) {
+  private static @NonNull SignalAccountRecord.PinnedConversation localToRemotePinnedConversation(@NonNull RecipientRecord settings) {
     switch (settings.getGroupType()) {
-      case NONE     : return SignalAccountRecord.PinnedConversation.forContact(new SignalServiceAddress(settings.getUuid(), settings.getE164()));
+      case NONE     : return SignalAccountRecord.PinnedConversation.forContact(new SignalServiceAddress(settings.getServiceId(), settings.getE164()));
       case SIGNAL_V1: return SignalAccountRecord.PinnedConversation.forGroupV1(settings.getGroupId().requireV1().getDecodedId());
       case SIGNAL_V2: return SignalAccountRecord.PinnedConversation.forGroupV2(settings.getSyncExtras().getGroupMasterKey().serialize());
       default       : throw new AssertionError("Unexpected group type!");
     }
   }
 
-  private static @NonNull SignalContactRecord localToRemoteContact(@NonNull RecipientSettings recipient, byte[] rawStorageId) {
-    if (recipient.getUuid() == null && recipient.getE164() == null) {
+  private static @NonNull SignalContactRecord localToRemoteContact(@NonNull RecipientRecord recipient, byte[] rawStorageId) {
+    if (recipient.getServiceId() == null && recipient.getE164() == null) {
       throw new AssertionError("Must have either a UUID or a phone number!");
     }
 
-    UUID uuid = recipient.getUuid() != null ? recipient.getUuid() : UuidUtil.UNKNOWN_UUID;
+    ServiceId serviceId = recipient.getServiceId() != null ? recipient.getServiceId() : ServiceId.UNKNOWN;
+    boolean   hideStory = recipient.getExtras() != null && recipient.getExtras().hideStory();
 
-    return new SignalContactRecord.Builder(rawStorageId, new SignalServiceAddress(uuid, recipient.getE164()))
-                                  .setUnknownFields(recipient.getSyncExtras().getStorageProto())
+    return new SignalContactRecord.Builder(rawStorageId, serviceId, recipient.getSyncExtras().getStorageProto())
+                                  .setE164(recipient.getE164())
+                                  .setPni(recipient.getPni())
                                   .setProfileKey(recipient.getProfileKey())
                                   .setGivenName(recipient.getProfileName().getGivenName())
                                   .setFamilyName(recipient.getProfileName().getFamilyName())
@@ -107,10 +123,11 @@ public final class StorageSyncModels {
                                   .setArchived(recipient.getSyncExtras().isArchived())
                                   .setForcedUnread(recipient.getSyncExtras().isForcedUnread())
                                   .setMuteUntil(recipient.getMuteUntil())
+                                  .setHideStory(hideStory)
                                   .build();
   }
 
-  private static @NonNull SignalGroupV1Record localToRemoteGroupV1(@NonNull RecipientSettings recipient, byte[] rawStorageId) {
+  private static @NonNull SignalGroupV1Record localToRemoteGroupV1(@NonNull RecipientRecord recipient, byte[] rawStorageId) {
     GroupId groupId = recipient.getGroupId();
 
     if (groupId == null) {
@@ -121,8 +138,7 @@ public final class StorageSyncModels {
       throw new AssertionError("Group is not V1");
     }
 
-    return new SignalGroupV1Record.Builder(rawStorageId, groupId.getDecodedId())
-                                  .setUnknownFields(recipient.getSyncExtras().getStorageProto())
+    return new SignalGroupV1Record.Builder(rawStorageId, groupId.getDecodedId(), recipient.getSyncExtras().getStorageProto())
                                   .setBlocked(recipient.isBlocked())
                                   .setProfileSharingEnabled(recipient.isProfileSharing())
                                   .setArchived(recipient.getSyncExtras().isArchived())
@@ -131,7 +147,7 @@ public final class StorageSyncModels {
                                   .build();
   }
 
-  private static @NonNull SignalGroupV2Record localToRemoteGroupV2(@NonNull RecipientSettings recipient, byte[] rawStorageId, @NonNull GroupMasterKey groupMasterKey) {
+  private static @NonNull SignalGroupV2Record localToRemoteGroupV2(@NonNull RecipientRecord recipient, byte[] rawStorageId, @NonNull GroupMasterKey groupMasterKey) {
     GroupId groupId = recipient.getGroupId();
 
     if (groupId == null) {
@@ -146,14 +162,51 @@ public final class StorageSyncModels {
       throw new AssertionError("Group master key not on recipient record");
     }
 
-    return new SignalGroupV2Record.Builder(rawStorageId, groupMasterKey)
-                                  .setUnknownFields(recipient.getSyncExtras().getStorageProto())
+    boolean hideStory = recipient.getExtras() != null && recipient.getExtras().hideStory();
+
+    return new SignalGroupV2Record.Builder(rawStorageId, groupMasterKey, recipient.getSyncExtras().getStorageProto())
                                   .setBlocked(recipient.isBlocked())
                                   .setProfileSharingEnabled(recipient.isProfileSharing())
                                   .setArchived(recipient.getSyncExtras().isArchived())
                                   .setForcedUnread(recipient.getSyncExtras().isForcedUnread())
                                   .setMuteUntil(recipient.getMuteUntil())
+                                  .setNotifyForMentionsWhenMuted(recipient.getMentionSetting() == RecipientDatabase.MentionSetting.ALWAYS_NOTIFY)
+                                  .setHideStory(hideStory)
                                   .build();
+  }
+
+  private static @NonNull SignalStoryDistributionListRecord localToRemoteStoryDistributionList(@NonNull RecipientRecord recipient, @NonNull byte[] rawStorageId) {
+    DistributionListId distributionListId = recipient.getDistributionListId();
+
+    if (distributionListId == null) {
+      throw new AssertionError("Must have a distributionListId!");
+    }
+
+    DistributionListRecord record = SignalDatabase.distributionLists().getListForStorageSync(distributionListId);
+    if (record == null) {
+      throw new AssertionError("Must have a distribution list record!");
+    }
+
+    if (record.getDeletedAtTimestamp() > 0L) {
+      return new SignalStoryDistributionListRecord.Builder(rawStorageId, recipient.getSyncExtras().getStorageProto())
+                                                  .setIdentifier(UuidUtil.toByteArray(record.getDistributionId().asUuid()))
+                                                  .setDeletedAtTimestamp(record.getDeletedAtTimestamp())
+                                                  .build();
+    }
+
+    return new SignalStoryDistributionListRecord.Builder(rawStorageId, recipient.getSyncExtras().getStorageProto())
+                                                .setIdentifier(UuidUtil.toByteArray(record.getDistributionId().asUuid()))
+                                                .setName(record.getName())
+                                                .setRecipients(record.getMembersToSync()
+                                                                     .stream()
+                                                                     .map(Recipient::resolved)
+                                                                     .filter(Recipient::hasServiceId)
+                                                                     .map(Recipient::requireServiceId)
+                                                                     .map(SignalServiceAddress::new)
+                                                                     .collect(Collectors.toList()))
+                                                .setAllowsReplies(record.getAllowsReplies())
+                                                .setIsBlockList(record.getPrivacyMode().isBlockList())
+                                                .build();
   }
 
   public static @NonNull IdentityDatabase.VerifiedStatus remoteToLocalIdentityStatus(@NonNull IdentityState identityState) {
@@ -172,4 +225,19 @@ public final class StorageSyncModels {
     }
   }
 
+  public static @NonNull SignalAccountRecord.Subscriber localToRemoteSubscriber(@Nullable Subscriber subscriber) {
+    if (subscriber == null) {
+      return new SignalAccountRecord.Subscriber(null, null);
+    } else {
+      return new SignalAccountRecord.Subscriber(subscriber.getCurrencyCode(), subscriber.getSubscriberId().getBytes());
+    }
+  }
+
+  public static @Nullable Subscriber remoteToLocalSubscriber(@NonNull SignalAccountRecord.Subscriber subscriber) {
+    if (subscriber.getId().isPresent()) {
+      return new Subscriber(SubscriberId.fromBytes(subscriber.getId().get()), subscriber.getCurrencyCode().get());
+    } else {
+      return null;
+    }
+  }
 }

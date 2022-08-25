@@ -8,11 +8,10 @@ import androidx.annotation.NonNull;
 
 import net.zetetic.database.sqlcipher.SQLiteDatabase;
 
-import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
 import org.thoughtcrime.securesms.database.model.PendingRetryReceiptModel;
 import org.thoughtcrime.securesms.recipients.RecipientId;
-import org.thoughtcrime.securesms.util.CursorUtil;
-import org.thoughtcrime.securesms.util.SqlUtil;
+import org.signal.core.util.CursorUtil;
+import org.signal.core.util.SqlUtil;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -41,7 +40,7 @@ public final class PendingRetryReceiptDatabase extends Database {
                                                                                  THREAD_ID          + " INTEGER NOT NULL, " +
                                                                                  "UNIQUE(" + AUTHOR + "," + SENT_TIMESTAMP + ") ON CONFLICT REPLACE);";
 
-  PendingRetryReceiptDatabase(Context context, SQLCipherOpenHelper databaseHelper) {
+  PendingRetryReceiptDatabase(Context context, SignalDatabase databaseHelper) {
     super(context, databaseHelper);
   }
 

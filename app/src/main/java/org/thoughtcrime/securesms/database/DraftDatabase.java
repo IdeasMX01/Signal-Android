@@ -10,9 +10,8 @@ import androidx.annotation.Nullable;
 
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
-import org.thoughtcrime.securesms.util.CursorUtil;
-import org.thoughtcrime.securesms.util.SqlUtil;
+import org.signal.core.util.CursorUtil;
+import org.signal.core.util.SqlUtil;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -35,7 +34,7 @@ public class DraftDatabase extends Database {
     "CREATE INDEX IF NOT EXISTS draft_thread_index ON " + TABLE_NAME + " (" + THREAD_ID + ");",
   };
 
-  public DraftDatabase(Context context, SQLCipherOpenHelper databaseHelper) {
+  public DraftDatabase(Context context, SignalDatabase databaseHelper) {
     super(context, databaseHelper);
   }
 
@@ -165,6 +164,12 @@ public class DraftDatabase extends Database {
   }
 
   public static class Drafts extends LinkedList<Draft> {
+    public void addIfNotNull(@Nullable Draft draft) {
+      if (draft != null) {
+        add(draft);
+      }
+    }
+
     public @Nullable Draft getDraftOfType(String type) {
       for (Draft draft : this) {
         if (type.equals(draft.getType())) {

@@ -9,17 +9,22 @@ import io.reactivex.rxjava3.core.Maybe
 import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import io.reactivex.rxjava3.disposables.Disposable
+import io.reactivex.rxjava3.kotlin.plusAssign
+import io.reactivex.rxjava3.kotlin.subscribeBy
+import io.reactivex.rxjava3.subjects.BehaviorSubject
 import io.reactivex.rxjava3.subjects.PublishSubject
-import org.thoughtcrime.securesms.TransportOption
+import io.reactivex.rxjava3.subjects.Subject
 import org.thoughtcrime.securesms.components.mention.MentionAnnotation
+import org.thoughtcrime.securesms.contacts.paged.ContactSearchKey
+import org.thoughtcrime.securesms.conversation.MessageSendType
 import org.thoughtcrime.securesms.mediasend.Media
 import org.thoughtcrime.securesms.mediasend.MediaSendActivityResult
 import org.thoughtcrime.securesms.mediasend.VideoEditorFragment
 import org.thoughtcrime.securesms.mms.MediaConstraints
 import org.thoughtcrime.securesms.mms.SentMediaQuality
 import org.thoughtcrime.securesms.recipients.Recipient
-import org.thoughtcrime.securesms.recipients.RecipientId
 import org.thoughtcrime.securesms.scribbles.ImageEditorFragment
+import org.thoughtcrime.securesms.stories.Stories
 import org.thoughtcrime.securesms.util.SingleLiveEvent
 import org.thoughtcrime.securesms.util.Util
 import org.thoughtcrime.securesms.util.livedata.Store
@@ -30,17 +35,22 @@ import java.util.Collections
  */
 class MediaSelectionViewModel(
   val destination: MediaSelectionDestination,
-  transportOption: TransportOption,
+  sendType: MessageSendType,
   initialMedia: List<Media>,
   initialMessage: CharSequence?,
   val isReply: Boolean,
-  private val repository: MediaSelectionRepository
+  isStory: Boolean,
+  private val repository: MediaSelectionRepository,
+  private val identityChangesSince: Long = System.currentTimeMillis()
 ) : ViewModel() {
+
+  private val selectedMediaSubject: Subject<List<Media>> = BehaviorSubject.create()
 
   private val store: Store<MediaSelectionState> = Store(
     MediaSelectionState(
-      transportOption = transportOption,
-      message = initialMessage
+      sendType = sendType,
+      message = initialMessage,
+      isStory = isStory
     )
   )
 
@@ -59,7 +69,7 @@ class MediaSelectionViewModel(
     store.update {
       it.copy(
         isMeteredConnection = metered,
-        isPreUploadEnabled = shouldPreUpload(metered, it.transportOption.isSms, it.recipient)
+        isPreUploadEnabled = shouldPreUpload(metered, it.sendType.usesSmsTransport, it.recipient)
       )
     }
   }
@@ -67,18 +77,26 @@ class MediaSelectionViewModel(
   private var lastMediaDrag: Pair<Int, Int> = Pair(0, 0)
 
   init {
-    val recipientId = destination.getRecipientId()
-    if (recipientId != null) {
-      store.update(Recipient.live(recipientId).liveData) { r, s ->
+    val recipientSearchKey = destination.getRecipientSearchKey()
+    if (recipientSearchKey != null) {
+      store.update(Recipient.live(recipientSearchKey.recipientId).liveData) { r, s ->
         s.copy(
           recipient = r,
-          isPreUploadEnabled = shouldPreUpload(s.isMeteredConnection, s.transportOption.isSms, r)
+          isPreUploadEnabled = shouldPreUpload(s.isMeteredConnection, s.sendType.usesSmsTransport, r)
         )
       }
     }
 
     if (initialMedia.isNotEmpty()) {
       addMedia(initialMedia)
+    }
+
+    disposables += selectedMediaSubject.map { media ->
+      Stories.MediaTransform.getSendRequirements(media)
+    }.subscribeBy { requirements ->
+      store.update {
+        it.copy(storySendRequirements = requirements)
+      }
     }
   }
 
@@ -103,6 +121,14 @@ class MediaSelectionViewModel(
     addMedia(listOf(media))
   }
 
+  fun isStory(): Boolean {
+    return store.state.isStory
+  }
+
+  fun getStorySendRequirements(): Stories.MediaTransform.SendRequirements {
+    return store.state.storySendRequirements
+  }
+
   private fun addMedia(media: List<Media>) {
     val newSelectionList: List<Media> = linkedSetOf<Media>().apply {
       addAll(store.state.selectedMedia)
@@ -111,7 +137,7 @@ class MediaSelectionViewModel(
 
     disposables.add(
       repository
-        .populateAndFilterMedia(newSelectionList, getMediaConstraints(), store.state.maxSelection)
+        .populateAndFilterMedia(newSelectionList, getMediaConstraints(), store.state.maxSelection, store.state.isStory)
         .subscribe { filterResult ->
           if (filterResult.filteredMedia.isNotEmpty()) {
             store.update {
@@ -120,6 +146,8 @@ class MediaSelectionViewModel(
                 focusedMedia = it.focusedMedia ?: filterResult.filteredMedia.first()
               )
             }
+
+            selectedMediaSubject.onNext(filterResult.filteredMedia)
 
             val newMedia = filterResult.filteredMedia.toSet().intersect(media).toList()
             startUpload(newMedia)
@@ -179,6 +207,10 @@ class MediaSelectionViewModel(
   }
 
   fun removeMedia(media: Media) {
+    removeMedia(media, false)
+  }
+
+  private fun removeMedia(media: Media, suppressEmptyError: Boolean) {
     val snapshot = store.state
     val newMediaList = snapshot.selectedMedia - media
     val oldFocusIndex = snapshot.selectedMedia.indexOf(media)
@@ -197,10 +229,11 @@ class MediaSelectionViewModel(
       )
     }
 
-    if (newMediaList.isEmpty()) {
-      mediaErrors.postValue(MediaValidator.FilterError.NO_ITEMS)
+    if (newMediaList.isEmpty() && !suppressEmptyError) {
+      mediaErrors.postValue(MediaValidator.FilterError.NoItems())
     }
 
+    selectedMediaSubject.onNext(newMediaList)
     repository.deleteBlobs(listOf(media))
 
     cancelUpload(media)
@@ -216,7 +249,7 @@ class MediaSelectionViewModel(
   fun removeCameraFirstCapture() {
     val cameraFirstCapture: Media? = store.state.cameraFirstCapture
     if (cameraFirstCapture != null) {
-      removeMedia(cameraFirstCapture)
+      removeMedia(cameraFirstCapture, true)
     }
   }
 
@@ -235,8 +268,8 @@ class MediaSelectionViewModel(
   }
 
   fun getMediaConstraints(): MediaConstraints {
-    return if (store.state.transportOption.isSms) {
-      MediaConstraints.getMmsMediaConstraints(store.state.transportOption.simSubscriptionId.or(-1))
+    return if (store.state.sendType.usesSmsTransport) {
+      MediaConstraints.getMmsMediaConstraints(store.state.sendType.simSubscriptionId ?: -1)
     } else {
       MediaConstraints.getPushMediaConstraints()
     }
@@ -274,24 +307,26 @@ class MediaSelectionViewModel(
   }
 
   fun send(
-    selectedRecipientIds: List<RecipientId> = emptyList(),
+    selectedContacts: List<ContactSearchKey.RecipientSearchKey> = emptyList()
   ): Maybe<MediaSendActivityResult> {
-    return repository.send(
-      store.state.selectedMedia,
-      store.state.editorStateMap,
-      store.state.quality,
-      store.state.message,
-      store.state.transportOption.isSms,
-      isViewOnceEnabled(),
-      destination.getRecipientId(),
-      if (selectedRecipientIds.isNotEmpty()) selectedRecipientIds else destination.getRecipientIdList(),
-      MentionAnnotation.getMentionsFromAnnotations(store.state.message),
-      store.state.transportOption
+    return UntrustedRecords.checkForBadIdentityRecords(selectedContacts.toSet(), identityChangesSince).andThen(
+      repository.send(
+        store.state.selectedMedia,
+        store.state.editorStateMap,
+        store.state.quality,
+        store.state.message,
+        store.state.sendType.usesSmsTransport,
+        isViewOnceEnabled(),
+        destination.getRecipientSearchKey(),
+        selectedContacts.ifEmpty { destination.getRecipientSearchKeyList() },
+        MentionAnnotation.getMentionsFromAnnotations(store.state.message),
+        store.state.sendType
+      )
     )
   }
 
   private fun isViewOnceEnabled(): Boolean {
-    return !store.state.transportOption.isSms &&
+    return !store.state.sendType.usesSmsTransport &&
       store.state.selectedMedia.size == 1 &&
       store.state.viewOnceToggleState == MediaSelectionState.ViewOnceToggleState.ONCE
   }
@@ -301,7 +336,13 @@ class MediaSelectionViewModel(
       return
     }
 
-    repository.uploadRepository.startUpload(media, store.state.recipient)
+    val filteredPreUploadMedia = if (Stories.isFeatureEnabled()) {
+      media.filter { Stories.MediaTransform.canPreUploadMedia(it) }
+    } else {
+      media
+    }
+
+    repository.uploadRepository.startUpload(filteredPreUploadMedia, store.state.recipient)
   }
 
   private fun cancelUpload(media: Media) {
@@ -328,6 +369,10 @@ class MediaSelectionViewModel(
     outState.putParcelableArrayList(STATE_EDITORS, ArrayList(editorStates))
   }
 
+  fun hasSelectedMedia(): Boolean {
+    return store.state.selectedMedia.isNotEmpty()
+  }
+
   fun onRestoreState(savedInstanceState: Bundle) {
     val selection: List<Media> = savedInstanceState.getParcelableArrayList(STATE_SELECTION) ?: emptyList()
     val focused: Media? = savedInstanceState.getParcelable(STATE_FOCUSED)
@@ -340,6 +385,8 @@ class MediaSelectionViewModel(
 
     val editorStates: List<Bundle> = savedInstanceState.getParcelableArrayList(STATE_EDITORS) ?: emptyList()
     val editorStateMap = editorStates.associate { it.toAssociation() }
+
+    selectedMediaSubject.onNext(selection)
 
     store.update { state ->
       state.copy(
@@ -406,14 +453,15 @@ class MediaSelectionViewModel(
 
   class Factory(
     private val destination: MediaSelectionDestination,
-    private val transportOption: TransportOption,
+    private val sendType: MessageSendType,
     private val initialMedia: List<Media>,
     private val initialMessage: CharSequence?,
     private val isReply: Boolean,
+    private val isStory: Boolean,
     private val repository: MediaSelectionRepository
   ) : ViewModelProvider.Factory {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
-      return requireNotNull(modelClass.cast(MediaSelectionViewModel(destination, transportOption, initialMedia, initialMessage, isReply, repository)))
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+      return requireNotNull(modelClass.cast(MediaSelectionViewModel(destination, sendType, initialMedia, initialMessage, isReply, isStory, repository)))
     }
   }
 }

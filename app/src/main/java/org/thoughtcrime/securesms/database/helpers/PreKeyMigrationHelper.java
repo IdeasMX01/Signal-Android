@@ -12,21 +12,22 @@ import net.zetetic.database.sqlcipher.SQLiteDatabase;
 
 import org.signal.core.util.Conversions;
 import org.signal.core.util.logging.Log;
+import org.signal.libsignal.protocol.InvalidKeyException;
+import org.signal.libsignal.protocol.InvalidMessageException;
+import org.signal.libsignal.protocol.state.PreKeyRecord;
+import org.signal.libsignal.protocol.state.SignedPreKeyRecord;
 import org.thoughtcrime.securesms.database.OneTimePreKeyDatabase;
 import org.thoughtcrime.securesms.database.SignedPreKeyDatabase;
+import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.util.Base64;
 import org.thoughtcrime.securesms.util.JsonUtils;
-import org.thoughtcrime.securesms.util.TextSecurePreferences;
-import org.whispersystems.libsignal.InvalidMessageException;
-import org.whispersystems.libsignal.state.PreKeyRecord;
-import org.whispersystems.libsignal.state.SignedPreKeyRecord;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-class PreKeyMigrationHelper {
+public final class PreKeyMigrationHelper {
 
   private static final String PREKEY_DIRECTORY        = "prekeys";
   private static final String SIGNED_PREKEY_DIRECTORY = "signed_prekeys";
@@ -36,7 +37,7 @@ class PreKeyMigrationHelper {
 
   private static final String TAG = Log.tag(PreKeyMigrationHelper.class);
 
-  static boolean migratePreKeys(Context context, SQLiteDatabase database) {
+  public static boolean migratePreKeys(Context context, SQLiteDatabase database) {
     File[]  preKeyFiles = getPreKeyDirectory(context).listFiles();
     boolean clean       = true;
 
@@ -52,7 +53,7 @@ class PreKeyMigrationHelper {
             contentValues.put(OneTimePreKeyDatabase.PRIVATE_KEY, Base64.encodeBytes(preKey.getKeyPair().getPrivateKey().serialize()));
             database.insert(OneTimePreKeyDatabase.TABLE_NAME, null, contentValues);
             Log.i(TAG, "Migrated one-time prekey: " + preKey.getId());
-          } catch (IOException | InvalidMessageException e) {
+          } catch (IOException | InvalidMessageException | InvalidKeyException e) {
             Log.w(TAG, e);
             clean = false;
           }
@@ -94,7 +95,7 @@ class PreKeyMigrationHelper {
         reader.close();
 
         Log.i(TAG, "Setting next prekey id: " + index.nextPreKeyId);
-        TextSecurePreferences.setNextPreKeyId(context, index.nextPreKeyId);
+        SignalStore.account().aciPreKeys().setNextOneTimePreKeyId(index.nextPreKeyId);
       } catch (IOException e) {
         Log.w(TAG, e);
       }
@@ -108,8 +109,8 @@ class PreKeyMigrationHelper {
 
         Log.i(TAG, "Setting next signed prekey id: " + index.nextSignedPreKeyId);
         Log.i(TAG, "Setting active signed prekey id: " + index.activeSignedPreKeyId);
-        TextSecurePreferences.setNextSignedPreKeyId(context, index.nextSignedPreKeyId);
-        TextSecurePreferences.setActiveSignedPreKeyId(context, index.activeSignedPreKeyId);
+        SignalStore.account().aciPreKeys().setNextSignedPreKeyId(index.nextSignedPreKeyId);
+        SignalStore.account().aciPreKeys().setActiveSignedPreKeyId(index.activeSignedPreKeyId);
       } catch (IOException e) {
         Log.w(TAG, e);
       }
@@ -118,7 +119,7 @@ class PreKeyMigrationHelper {
     return clean;
   }
 
-  static void cleanUpPreKeys(@NonNull Context context) {
+  public static void cleanUpPreKeys(@NonNull Context context) {
     File   preKeyDirectory = getPreKeyDirectory(context);
     File[] preKeyFiles     = preKeyDirectory.listFiles();
 

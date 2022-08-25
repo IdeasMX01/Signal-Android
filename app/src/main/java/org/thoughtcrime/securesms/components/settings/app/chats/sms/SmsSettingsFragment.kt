@@ -8,13 +8,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.Navigation
 import org.thoughtcrime.securesms.R
 import org.thoughtcrime.securesms.components.settings.DSLConfiguration
-import org.thoughtcrime.securesms.components.settings.DSLSettingsAdapter
 import org.thoughtcrime.securesms.components.settings.DSLSettingsFragment
 import org.thoughtcrime.securesms.components.settings.DSLSettingsText
 import org.thoughtcrime.securesms.components.settings.configure
 import org.thoughtcrime.securesms.keyvalue.SignalStore
 import org.thoughtcrime.securesms.util.SmsUtil
 import org.thoughtcrime.securesms.util.Util
+import org.thoughtcrime.securesms.util.adapter.mapping.MappingAdapter
+import org.thoughtcrime.securesms.util.navigation.safeNavigate
 
 private const val SMS_REQUEST_CODE: Short = 1234
 
@@ -27,7 +28,7 @@ class SmsSettingsFragment : DSLSettingsFragment(R.string.preferences__sms_mms) {
     viewModel.checkSmsEnabled()
   }
 
-  override fun bindAdapter(adapter: DSLSettingsAdapter) {
+  override fun bindAdapter(adapter: MappingAdapter) {
     viewModel = ViewModelProvider(this)[SmsSettingsViewModel::class.java]
 
     viewModel.state.observe(viewLifecycleOwner) {
@@ -76,7 +77,7 @@ class SmsSettingsFragment : DSLSettingsFragment(R.string.preferences__sms_mms) {
         clickPref(
           title = DSLSettingsText.from(R.string.preferences__advanced_mms_access_point_names),
           onClick = {
-            Navigation.findNavController(requireView()).navigate(R.id.action_smsSettingsFragment_to_mmsPreferencesFragment)
+            Navigation.findNavController(requireView()).safeNavigate(R.id.action_smsSettingsFragment_to_mmsPreferencesFragment)
           }
         )
       }

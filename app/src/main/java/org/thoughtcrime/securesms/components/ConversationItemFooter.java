@@ -28,7 +28,7 @@ import com.airbnb.lottie.model.KeyPath;
 import org.signal.core.util.concurrent.SignalExecutors;
 import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.animation.AnimationCompleteListener;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.database.model.MmsMessageRecord;
 import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
@@ -41,10 +41,10 @@ import org.thoughtcrime.securesms.util.SignalLocalMetrics;
 import org.thoughtcrime.securesms.util.ViewUtil;
 import org.thoughtcrime.securesms.util.dualsim.SubscriptionInfoCompat;
 import org.thoughtcrime.securesms.util.dualsim.SubscriptionManagerCompat;
-import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 public class ConversationItemFooter extends ConstraintLayout {
@@ -246,7 +246,7 @@ public class ConversationItemFooter extends ConstraintLayout {
                                });
 
     if (isOutgoing) {
-      dateView.setMaxWidth(ViewUtil.dpToPx(28));
+      dateView.setMaxWidth(ViewUtil.dpToPx(32));
     } else {
       ConstraintSet constraintSet = new ConstraintSet();
       constraintSet.clone(this);
@@ -360,8 +360,11 @@ public class ConversationItemFooter extends ConstraintLayout {
           long                   id                = messageRecord.getId();
           boolean                mms               = messageRecord.isMms();
 
-          if (mms) DatabaseFactory.getMmsDatabase(getContext()).markExpireStarted(id);
-          else DatabaseFactory.getSmsDatabase(getContext()).markExpireStarted(id);
+          if (mms) {
+            SignalDatabase.mms().markExpireStarted(id);
+          } else {
+            SignalDatabase.sms().markExpireStarted(id);
+          }
 
           expirationManager.scheduleDeletion(id, mms, messageRecord.getExpiresIn());
         });

@@ -22,9 +22,8 @@ import androidx.navigation.Navigation;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.LoggingFragment;
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.database.documents.Document;
 import org.thoughtcrime.securesms.keyvalue.SignalStore;
-import org.thoughtcrime.securesms.util.BackupUtil;
+import org.thoughtcrime.securesms.util.navigation.SafeNavigation;
 
 public class ChooseBackupFragment extends LoggingFragment {
 
@@ -57,7 +56,7 @@ public class ChooseBackupFragment extends LoggingFragment {
 
       restore.setUri(data.getData());
 
-      Navigation.findNavController(requireView()).navigate(restore);
+      SafeNavigation.safeNavigate(Navigation.findNavController(requireView()), restore);
     }
   }
 

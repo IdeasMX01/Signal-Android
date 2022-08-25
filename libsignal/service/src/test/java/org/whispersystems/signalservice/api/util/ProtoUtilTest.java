@@ -12,12 +12,8 @@ import org.thoughtcrime.securesms.util.testprotos.TestPersonWithNewMessage;
 import org.thoughtcrime.securesms.util.testprotos.TestPersonWithNewRepeatedString;
 import org.thoughtcrime.securesms.util.testprotos.TestPersonWithNewString;
 import org.thoughtcrime.securesms.util.testprotos.TestPersonWithNewStringAndInt;
-import org.whispersystems.signalservice.api.util.ProtoUtil;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class ProtoUtilTest {
@@ -236,6 +232,6 @@ public class ProtoUtilTest {
     TestInnerMessageWithNewString reparsedTest = TestInnerMessageWithNewString.parseFrom(combined.toByteArray());
 
     Assert.assertEquals("a2", reparsedTest.getInner().getA());
-    Assert.assertEquals("", reparsedTest.getInner().getB());
+    Assert.assertEquals("b1", reparsedTest.getInner().getB());
   }
 }

@@ -42,11 +42,18 @@ class SoundsAndNotificationsSettingsViewModel(
     repository.setMentionSetting(recipientId, mentionSetting)
   }
 
+  fun channelConsistencyCheck() {
+    store.update { s -> s.copy(channelConsistencyCheckComplete = false) }
+    repository.ensureCustomChannelConsistency {
+      store.update { s -> s.copy(channelConsistencyCheckComplete = true) }
+    }
+  }
+
   class Factory(
     private val recipientId: RecipientId,
     private val repository: SoundsAndNotificationsSettingsRepository
   ) : ViewModelProvider.Factory {
-    override fun <T : ViewModel?> create(modelClass: Class<T>): T {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
       return requireNotNull(modelClass.cast(SoundsAndNotificationsSettingsViewModel(recipientId, repository)))
     }
   }

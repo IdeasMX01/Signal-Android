@@ -11,18 +11,18 @@ import org.signal.core.util.StreamUtil;
 import org.signal.core.util.concurrent.SignalExecutors;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.conversation.ConversationMessage.ConversationMessageFactory;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.MessageDatabase;
 import org.thoughtcrime.securesms.database.MmsDatabase;
+import org.thoughtcrime.securesms.database.SignalDatabase;
 import org.thoughtcrime.securesms.database.SmsDatabase;
 import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.database.model.MmsMessageRecord;
 import org.thoughtcrime.securesms.mms.PartAuthority;
 import org.thoughtcrime.securesms.mms.TextSlide;
-import org.whispersystems.libsignal.util.guava.Optional;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Optional;
 
 class LongMessageRepository {
 
@@ -31,9 +31,9 @@ class LongMessageRepository {
   private final MessageDatabase mmsDatabase;
   private final MessageDatabase smsDatabase;
 
-  LongMessageRepository(@NonNull Context context) {
-    this.mmsDatabase = DatabaseFactory.getMmsDatabase(context);
-    this.smsDatabase = DatabaseFactory.getSmsDatabase(context);
+  LongMessageRepository() {
+    this.mmsDatabase = SignalDatabase.mms();
+    this.smsDatabase = SignalDatabase.sms();
   }
 
   void getMessage(@NonNull Context context, long messageId, boolean isMms, @NonNull Callback<Optional<LongMessage>> callback) {
@@ -59,7 +59,7 @@ class LongMessageRepository {
         return Optional.of(new LongMessage(ConversationMessageFactory.createWithUnresolvedData(context, record.get())));
       }
     } else {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 
@@ -70,7 +70,7 @@ class LongMessageRepository {
     if (record.isPresent()) {
       return Optional.of(new LongMessage(ConversationMessageFactory.createWithUnresolvedData(context, record.get())));
     } else {
-      return Optional.absent();
+      return Optional.empty();
     }
   }
 
@@ -78,14 +78,14 @@ class LongMessageRepository {
   @WorkerThread
   private Optional<MmsMessageRecord> getMmsMessage(@NonNull MessageDatabase mmsDatabase, long messageId) {
     try (Cursor cursor = mmsDatabase.getMessageCursor(messageId)) {
-      return Optional.fromNullable((MmsMessageRecord) MmsDatabase.readerFor(cursor).getNext());
+      return Optional.ofNullable((MmsMessageRecord) MmsDatabase.readerFor(cursor).getNext());
     }
   }
 
   @WorkerThread
   private Optional<MessageRecord> getSmsMessage(@NonNull MessageDatabase smsDatabase, long messageId) {
     try (Cursor cursor = smsDatabase.getMessageCursor(messageId)) {
-      return Optional.fromNullable(SmsDatabase.readerFor(cursor).getNext());
+      return Optional.ofNullable(SmsDatabase.readerFor(cursor).getNext());
     }
   }
 

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    tools:viewBindingIgnore="true"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -107,9 +108,9 @@
                 app:layout_constraintTop_toBottomOf="@id/insights_dashboard_encrypted_messages"
                 tools:text="100% of your outgoing messages in the past 7 days were end-to-end encrypted with Signal Protocol." />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/insights_dashboard_start_a_conversation"
-                style="@style/Button.Borderless"
+                style="@style/Signal.Widget.Button.Large.Secondary"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_marginStart="16dp"
@@ -127,7 +128,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:gravity="center"
-                android:text="@string/InsightsDashboardFragment__boost_your_signal"
+                android:text="@string/InsightsDashboardFragment__spread_the_word"
                 android:textAppearance="@style/TextAppearance.Signal.SubHead.Insights"
                 app:layout_constrainedWidth="true"
                 app:layout_constraintEnd_toEndOf="parent"

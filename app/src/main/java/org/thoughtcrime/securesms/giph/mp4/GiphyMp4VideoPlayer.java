@@ -1,17 +1,18 @@
 package org.thoughtcrime.securesms.giph.mp4;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.util.AttributeSet;
+import android.view.TextureView;
+import android.view.View;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.lifecycle.DefaultLifecycleObserver;
-import androidx.lifecycle.LifecycleOwner;
 
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.ui.AspectRatioFrameLayout;
@@ -20,9 +21,7 @@ import com.google.android.exoplayer2.ui.PlayerView;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.R;
 import org.thoughtcrime.securesms.components.CornerMask;
-import org.thoughtcrime.securesms.dependencies.ApplicationDependencies;
 import org.thoughtcrime.securesms.util.Projection;
-import org.thoughtcrime.securesms.video.exo.ExoPlayerKt;
 
 /**
  * Video Player class specifically created for the GiphyMp4Fragment.
@@ -51,12 +50,6 @@ public final class GiphyMp4VideoPlayer extends FrameLayout implements DefaultLif
     inflate(context, R.layout.gif_player, this);
 
     this.exoView = findViewById(R.id.video_view);
-  }
-
-  @Override
-  protected void onDetachedFromWindow() {
-    Log.d(TAG, "onDetachedFromWindow");
-    super.onDetachedFromWindow();
   }
 
   @Override
@@ -107,6 +100,12 @@ public final class GiphyMp4VideoPlayer extends FrameLayout implements DefaultLif
     }
   }
 
+  void pause() {
+    if (exoPlayer != null) {
+      exoPlayer.pause();
+    }
+  }
+
   void stop() {
     if (exoPlayer != null) {
       exoPlayer.stop();
@@ -125,5 +124,14 @@ public final class GiphyMp4VideoPlayer extends FrameLayout implements DefaultLif
 
   void setResizeMode(@AspectRatioFrameLayout.ResizeMode int resizeMode) {
     exoView.setResizeMode(resizeMode);
+  }
+
+  @Nullable Bitmap getBitmap() {
+    final View view = exoView.getVideoSurfaceView();
+    if (view instanceof TextureView) {
+      return ((TextureView) view).getBitmap();
+    }
+
+    return null;
   }
 }

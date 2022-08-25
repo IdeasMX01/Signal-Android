@@ -1,13 +1,11 @@
 package org.whispersystems.signalservice.internal.serialize;
 
-import com.google.protobuf.ByteString;
 
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.whispersystems.signalservice.api.push.ServiceId;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
-import org.whispersystems.signalservice.api.util.UuidUtil;
 import org.whispersystems.signalservice.internal.serialize.protos.AddressProto;
 
-import java.util.UUID;
+import java.util.Optional;
 
 public final class SignalServiceAddressProtobufSerializer {
 
@@ -17,7 +15,7 @@ public final class SignalServiceAddressProtobufSerializer {
   public static AddressProto toProtobuf(SignalServiceAddress signalServiceAddress) {
     AddressProto.Builder builder = AddressProto.newBuilder();
 
-    builder.setUuid(ByteString.copyFrom(UuidUtil.toByteArray(signalServiceAddress.getUuid())));
+    builder.setUuid(signalServiceAddress.getServiceId().toByteString());
 
     if(signalServiceAddress.getNumber().isPresent()){
       builder.setE164(signalServiceAddress.getNumber().get());
@@ -27,9 +25,9 @@ public final class SignalServiceAddressProtobufSerializer {
   }
 
   public static SignalServiceAddress fromProtobuf(AddressProto addressProto) {
-    UUID             uuid   = UuidUtil.parseOrThrow(addressProto.getUuid().toByteArray());
-    Optional<String> number = addressProto.hasE164()  ? Optional.of(addressProto.getE164()) : Optional.absent();
+    ServiceId        serviceId = ServiceId.parseOrThrow(addressProto.getUuid().toByteArray());
+    Optional<String> number    = addressProto.hasE164() ? Optional.of(addressProto.getE164()) : Optional.empty();
 
-    return new SignalServiceAddress(uuid, number);
+    return new SignalServiceAddress(serviceId, number);
   }
 }

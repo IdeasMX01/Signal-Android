@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.text.Spannable;
 import android.text.SpannableString;
+import android.text.method.LinkMovementMethod;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,10 +13,14 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.content.res.AppCompatResources;
+import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.res.ColorStateListInflaterCompat;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.Observer;
+import androidx.lifecycle.Transformations;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.common.collect.Sets;
@@ -23,43 +28,49 @@ import com.google.common.collect.Sets;
 import org.signal.core.util.logging.Log;
 import org.thoughtcrime.securesms.BindableConversationItem;
 import org.thoughtcrime.securesms.R;
-import org.thoughtcrime.securesms.VerifyIdentityActivity;
 import org.thoughtcrime.securesms.conversation.colors.Colorizer;
 import org.thoughtcrime.securesms.conversation.mutiselect.MultiselectPart;
 import org.thoughtcrime.securesms.conversation.ui.error.EnableCallNotificationSettingsDialog;
-import org.thoughtcrime.securesms.database.model.IdentityRecord;
 import org.thoughtcrime.securesms.database.model.GroupCallUpdateDetailsUtil;
+import org.thoughtcrime.securesms.database.model.IdentityRecord;
 import org.thoughtcrime.securesms.database.model.InMemoryMessageRecord;
 import org.thoughtcrime.securesms.database.model.LiveUpdateMessage;
 import org.thoughtcrime.securesms.database.model.MessageRecord;
 import org.thoughtcrime.securesms.database.model.UpdateDescription;
+import org.thoughtcrime.securesms.groups.LiveGroup;
+import org.thoughtcrime.securesms.keyvalue.SignalStore;
 import org.thoughtcrime.securesms.mms.GlideRequests;
 import org.thoughtcrime.securesms.recipients.LiveRecipient;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.util.DateUtils;
 import org.thoughtcrime.securesms.util.IdentityUtil;
 import org.thoughtcrime.securesms.util.Projection;
-import org.thoughtcrime.securesms.util.TextSecurePreferences;
+import org.thoughtcrime.securesms.util.ProjectionList;
 import org.thoughtcrime.securesms.util.ThemeUtil;
 import org.thoughtcrime.securesms.util.Util;
 import org.thoughtcrime.securesms.util.ViewUtil;
 import org.thoughtcrime.securesms.util.concurrent.ListenableFuture;
 import org.thoughtcrime.securesms.util.livedata.LiveDataUtil;
-import org.whispersystems.libsignal.util.guava.Optional;
+import org.thoughtcrime.securesms.util.views.AutoRounder;
+import org.thoughtcrime.securesms.util.views.Stub;
+import org.thoughtcrime.securesms.verify.VerifyIdentityActivity;
+import org.whispersystems.signalservice.api.push.ServiceId;
 
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 public final class ConversationUpdateItem extends FrameLayout
                                           implements BindableConversationItem
 {
-  private static final String TAG = Log.tag(ConversationUpdateItem.class);
+  private static final String         TAG                   = Log.tag(ConversationUpdateItem.class);
+  private static final ProjectionList EMPTY_PROJECTION_LIST = new ProjectionList();
+
 
   private Set<MultiselectPart> batchSelected;
 
@@ -68,18 +79,19 @@ public final class ConversationUpdateItem extends FrameLayout
   private View                      background;
   private ConversationMessage       conversationMessage;
   private Recipient                 conversationRecipient;
+  private Optional<MessageRecord>   previousMessageRecord;
   private Optional<MessageRecord>   nextMessageRecord;
   private MessageRecord             messageRecord;
   private boolean                   isMessageRequestAccepted;
   private LiveData<SpannableString> displayBody;
   private EventListener             eventListener;
-  private boolean                   hasWallpaper;
 
   private final UpdateObserver updateObserver = new UpdateObserver();
 
   private final PresentOnChange          presentOnChange = new PresentOnChange();
   private final RecipientObserverManager senderObserver  = new RecipientObserverManager(presentOnChange);
   private final RecipientObserverManager groupObserver   = new RecipientObserverManager(presentOnChange);
+  private final GroupDataManager         groupData       = new GroupDataManager();
 
   public ConversationUpdateItem(Context context) {
     super(context);
@@ -95,6 +107,9 @@ public final class ConversationUpdateItem extends FrameLayout
     this.body         = findViewById(R.id.conversation_update_body);
     this.actionButton = findViewById(R.id.conversation_update_action);
     this.background   = findViewById(R.id.conversation_update_background);
+
+    body.setOnClickListener(v -> performClick());
+    body.setOnLongClickListener(v -> performLongClick());
 
     this.setOnClickListener(new InternalClickListener(null));
   }
@@ -113,7 +128,8 @@ public final class ConversationUpdateItem extends FrameLayout
                    boolean hasWallpaper,
                    boolean isMessageRequestAccepted,
                    boolean allowedToPlayInline,
-                   @NonNull Colorizer colorizer)
+                   @NonNull Colorizer colorizer,
+                   boolean isCondensedMode)
   {
     this.batchSelected = batchSelected;
 
@@ -138,17 +154,19 @@ public final class ConversationUpdateItem extends FrameLayout
                     boolean hasWallpaper,
                     boolean isMessageRequestAccepted)
   {
-    this.hasWallpaper             = hasWallpaper;
     this.conversationMessage      = conversationMessage;
     this.messageRecord            = conversationMessage.getMessageRecord();
+    this.previousMessageRecord    = previousMessageRecord;
     this.nextMessageRecord        = nextMessageRecord;
     this.conversationRecipient    = conversationRecipient;
     this.isMessageRequestAccepted = isMessageRequestAccepted;
 
     senderObserver.observe(lifecycleOwner, messageRecord.getIndividualRecipient());
 
-    if (conversationRecipient.isActiveGroup() && conversationMessage.getMessageRecord().isGroupCall()) {
+    if (conversationRecipient.isActiveGroup() &&
+        (messageRecord.isGroupCall() || messageRecord.isCollapsedGroupV2JoinUpdate() || messageRecord.isGroupV2JoinRequest(messageRecord.getIndividualRecipient().getServiceId().orElse(null)))) {
       groupObserver.observe(lifecycleOwner, conversationRecipient);
+      groupData.observe(lifecycleOwner, conversationRecipient);
     } else {
       groupObserver.observe(lifecycleOwner, null);
     }
@@ -158,15 +176,7 @@ public final class ConversationUpdateItem extends FrameLayout
       textColor = ContextCompat.getColor(getContext(), R.color.core_grey_15);
     }
 
-    if (!ThemeUtil.isDarkTheme(getContext())) {
-      if (hasWallpaper) {
-        actionButton.setStrokeColor(ColorStateList.valueOf(getResources().getColor(R.color.core_grey_45)));
-      } else {
-        actionButton.setStrokeColor(ColorStateList.valueOf(getResources().getColor(R.color.signal_button_secondary_stroke)));
-      }
-    }
-
-    UpdateDescription         updateDescription = Objects.requireNonNull(messageRecord.getUpdateDisplayBody(getContext()));
+    UpdateDescription         updateDescription = Objects.requireNonNull(messageRecord.getUpdateDisplayBody(getContext(), eventListener::onRecipientNameClicked));
     LiveData<SpannableString> liveUpdateMessage = LiveUpdateMessage.fromMessageDescription(getContext(), updateDescription, textColor, true);
     LiveData<SpannableString> spannableMessage  = loading(liveUpdateMessage);
 
@@ -177,6 +187,19 @@ public final class ConversationUpdateItem extends FrameLayout
     presentBackground(shouldCollapse(messageRecord, previousMessageRecord),
                       shouldCollapse(messageRecord, nextMessageRecord),
                       hasWallpaper);
+
+    presentActionButton(hasWallpaper, conversationMessage.getMessageRecord().isBoostRequest());
+
+    updateSelectedState();
+  }
+
+  @Override
+  public void updateSelectedState() {
+    if (batchSelected.size() > 0) {
+      body.setMovementMethod(null);
+    } else {
+      body.setMovementMethod(LinkMovementMethod.getInstance());
+    }
   }
 
   private static boolean shouldCollapse(@NonNull MessageRecord current, @NonNull Optional<MessageRecord> candidate)
@@ -221,8 +244,13 @@ public final class ConversationUpdateItem extends FrameLayout
   }
 
   @Override
-  public @NonNull List<Projection> getColorizerProjections(@NonNull ViewGroup coordinateRoot) {
-    return Collections.emptyList();
+  public boolean shouldProjectContent() {
+    return false;
+  }
+
+  @Override
+  public @NonNull ProjectionList getColorizerProjections(@NonNull ViewGroup coordinateRoot) {
+    return EMPTY_PROJECTION_LIST;
   }
 
   @Override
@@ -255,6 +283,84 @@ public final class ConversationUpdateItem extends FrameLayout
 
     @NonNull Recipient getObservedRecipient() {
       return recipient.get();
+    }
+  }
+
+  private final class GroupDataManager {
+
+    private final Observer<Object> updater;
+
+    private LiveGroup           liveGroup;
+    private LiveData<Boolean>   liveIsSelfAdmin;
+    private LiveData<Set<UUID>> liveBannedMembers;
+    private LiveData<Set<UUID>> liveFullMembers;
+    private Recipient           conversationRecipient;
+
+    GroupDataManager() {
+      this.updater = unused -> update();
+    }
+
+    public void observe(@NonNull LifecycleOwner lifecycleOwner, @Nullable Recipient recipient) {
+      if (liveGroup != null) {
+        liveIsSelfAdmin.removeObserver(updater);
+        liveBannedMembers.removeObserver(updater);
+        liveFullMembers.removeObserver(updater);
+      }
+
+      if (recipient != null) {
+        conversationRecipient = recipient;
+        liveGroup             = new LiveGroup(recipient.requireGroupId());
+        liveIsSelfAdmin       = liveGroup.isSelfAdmin();
+        liveBannedMembers     = liveGroup.getBannedMembers();
+        liveFullMembers       = Transformations.map(liveGroup.getFullMembers(),
+                                                    members -> members.stream()
+                                                                      .map(m -> m.getMember().requireServiceId().uuid())
+                                                                      .collect(Collectors.toSet()));
+
+        liveIsSelfAdmin.observe(lifecycleOwner, updater);
+        liveBannedMembers.observe(lifecycleOwner, updater);
+        liveFullMembers.observe(lifecycleOwner, updater);
+      } else {
+        conversationRecipient = null;
+        liveGroup             = null;
+        liveBannedMembers     = null;
+        liveIsSelfAdmin       = null;
+      }
+    }
+
+    public boolean isSelfAdmin() {
+      if (liveIsSelfAdmin == null) {
+        return false;
+      }
+      return liveIsSelfAdmin.getValue() != null ? liveIsSelfAdmin.getValue() : false;
+    }
+
+    public boolean isBanned(Recipient recipient) {
+      if (liveBannedMembers == null) {
+        return false;
+      }
+
+      Set<UUID> bannedMembers = liveBannedMembers.getValue();
+      if (bannedMembers != null) {
+        return recipient.getServiceId().isPresent() && bannedMembers.contains(recipient.requireServiceId().uuid());
+      }
+      return false;
+    }
+
+    public boolean isFullMember(Recipient recipient) {
+      if (liveFullMembers == null) {
+        return false;
+      }
+
+      Set<UUID> members = liveFullMembers.getValue();
+      if (members != null) {
+        return recipient.getServiceId().isPresent() && members.contains(recipient.requireServiceId().uuid());
+      }
+      return false;
+    }
+
+    private void update() {
+      present(conversationMessage, nextMessageRecord, conversationRecipient, isMessageRequestAccepted);
     }
   }
 
@@ -339,12 +445,12 @@ public final class ConversationUpdateItem extends FrameLayout
         }
       });
     } else if (conversationMessage.getMessageRecord().isGroupCall()) {
-      UpdateDescription updateDescription = MessageRecord.getGroupCallUpdateDescription(getContext(), conversationMessage.getMessageRecord().getBody(), true);
-      Collection<UUID>  uuids             = updateDescription.getMentioned();
+      UpdateDescription     updateDescription = MessageRecord.getGroupCallUpdateDescription(getContext(), conversationMessage.getMessageRecord().getBody(), true);
+      Collection<ServiceId> sids              = updateDescription.getMentioned();
 
       int text = 0;
-      if (Util.hasItems(uuids)) {
-        if (uuids.contains(TextSecurePreferences.getLocalUuid(getContext()))) {
+      if (Util.hasItems(sids)) {
+        if (sids.contains(SignalStore.account().requireAci())) {
           text = R.string.ConversationUpdateItem_return_to_call;
         } else if (GroupCallUpdateDetailsUtil.parse(conversationMessage.getMessageRecord().getBody()).getIsCallFull()) {
           text = R.string.ConversationUpdateItem_call_is_full;
@@ -395,7 +501,7 @@ public final class ConversationUpdateItem extends FrameLayout
       actionButton.setText(R.string.ConversationUpdateItem_view);
       actionButton.setOnClickListener(v -> {
         if (eventListener != null) {
-          eventListener.onViewGroupDescriptionChange(conversationRecipient.getGroupId().orNull(), conversationMessage.getMessageRecord().getGroupV2DescriptionUpdate(), isMessageRequestAccepted);
+          eventListener.onViewGroupDescriptionChange(conversationRecipient.getGroupId().orElse(null), conversationMessage.getMessageRecord().getGroupV2DescriptionUpdate(), isMessageRequestAccepted);
         }
       });
     } else if (conversationMessage.getMessageRecord().isBadDecryptType() &&
@@ -416,10 +522,38 @@ public final class ConversationUpdateItem extends FrameLayout
           eventListener.onChangeNumberUpdateContact(conversationMessage.getMessageRecord().getIndividualRecipient());
         }
       });
+    } else if (shouldShowBlockRequestAction(conversationMessage.getMessageRecord())) {
+      actionButton.setText(R.string.ConversationUpdateItem_block_request);
+      actionButton.setVisibility(VISIBLE);
+      actionButton.setOnClickListener(v -> {
+        if (batchSelected.isEmpty() && eventListener != null) {
+          eventListener.onBlockJoinRequest(conversationMessage.getMessageRecord().getIndividualRecipient());
+        }
+      });
+    } else if (conversationMessage.getMessageRecord().isBoostRequest()) {
+      actionButton.setVisibility(VISIBLE);
+      actionButton.setOnClickListener(v -> {
+        if (batchSelected.isEmpty() && eventListener != null) {
+          eventListener.onDonateClicked();
+        }
+      });
+
+      actionButton.setText(R.string.ConversationUpdateItem_donate);
     } else {
       actionButton.setVisibility(GONE);
       actionButton.setOnClickListener(null);
     }
+  }
+
+  private boolean shouldShowBlockRequestAction(MessageRecord messageRecord) {
+    Recipient toBlock = messageRecord.getIndividualRecipient();
+
+    if (!toBlock.hasServiceId() || !groupData.isSelfAdmin() || groupData.isBanned(toBlock) || groupData.isFullMember(toBlock)) {
+      return false;
+    }
+
+    return (messageRecord.isCollapsedGroupV2JoinUpdate() && !nextMessageRecord.map(m -> m.isGroupV2JoinRequest(toBlock.requireServiceId())).orElse(false)) ||
+           (messageRecord.isGroupV2JoinRequest(toBlock.requireServiceId()) && previousMessageRecord.map(m -> m.isCollapsedGroupV2JoinUpdate(toBlock.requireServiceId())).orElse(false));
   }
 
   private void presentBackground(boolean collapseAbove, boolean collapseBelow, boolean hasWallpaper) {
@@ -484,6 +618,19 @@ public final class ConversationUpdateItem extends FrameLayout
       } else {
         background.setBackground(null);
       }
+    }
+  }
+
+  private void presentActionButton(boolean hasWallpaper, boolean isBoostRequest) {
+    if (isBoostRequest) {
+      actionButton.setBackgroundTintList(ColorStateList.valueOf(ContextCompat.getColor(getContext(), R.color.signal_colorSecondaryContainer)));
+      actionButton.setTextColor(ColorStateList.valueOf(ContextCompat.getColor(getContext(), R.color.signal_colorOnSecondaryContainer)));
+    } else if (hasWallpaper) {
+      actionButton.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.conversation_update_item_button_background_wallpaper));
+      actionButton.setTextColor(AppCompatResources.getColorStateList(getContext(), R.color.conversation_update_item_button_text_color_wallpaper));
+    } else {
+      actionButton.setBackgroundTintList(AppCompatResources.getColorStateList(getContext(), R.color.conversation_update_item_button_background_normal));
+      actionButton.setTextColor(AppCompatResources.getColorStateList(getContext(), R.color.conversation_update_item_button_text_color_normal));
     }
   }
 
